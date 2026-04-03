@@ -6,13 +6,15 @@ interface MatchCardProps {
   teamB: string;
   flagA: string;
   flagB: string;
-  date: string;
   time: string;
   group: string;
+  city: string;
   matchNumber: number;
+  date?: string;
+  stage?: string;
 }
 
-const MatchCard = ({ teamA, teamB, flagA, flagB, date, time, group, matchNumber }: MatchCardProps) => {
+const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber }: MatchCardProps) => {
   const [expanded, setExpanded] = useState(false);
   const [scoreA, setScoreA] = useState<number | "">("");
   const [scoreB, setScoreB] = useState<number | "">("");
