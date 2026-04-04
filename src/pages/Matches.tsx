@@ -1,10 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MatchCard from "@/components/MatchCard";
-import { phases, getMatchesByPhase, groupByDate, type PhaseKey } from "@/data/matches";
+import { phases, fetchMatchesByPhase, groupByDate, type PhaseKey, type MatchData } from "@/data/matches";
 
 const Matches = () => {
   const [activePhase, setActivePhase] = useState<PhaseKey>("Grupos");
-  const matchDays = groupByDate(getMatchesByPhase(activePhase));
+  const [matches, setMatches] = useState<MatchData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchMatchesByPhase(activePhase).then((data) => {
+      setMatches(data);
+      setLoading(false);
+    });
+  }, [activePhase]);
+
+  const matchDays = groupByDate(matches);
 
   return (
     <div className="min-h-screen pb-24 pt-4">
@@ -30,19 +41,25 @@ const Matches = () => {
       </div>
 
       <div className="px-4 space-y-6">
-        {matchDays.map(({ date, matches }) => (
-          <div key={date}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-2 h-2 rounded-full bg-primary" />
-              <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{date}</h2>
+        {loading ? (
+          <div className="text-center py-12 text-muted-foreground text-sm">Carregando jogos...</div>
+        ) : matchDays.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground text-sm">Nenhum jogo encontrado</div>
+        ) : (
+          matchDays.map(({ date, matches }) => (
+            <div key={date}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-2 rounded-full bg-primary" />
+                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{date}</h2>
+              </div>
+              <div className="space-y-3">
+                {matches.map((match) => (
+                  <MatchCard key={match.matchNumber} {...match} />
+                ))}
+              </div>
             </div>
-            <div className="space-y-3">
-              {matches.map((match) => (
-                <MatchCard key={match.matchNumber} {...match} />
-              ))}
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
