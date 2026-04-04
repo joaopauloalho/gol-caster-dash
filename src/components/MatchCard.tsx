@@ -52,7 +52,11 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
       >
         <div className="flex items-center gap-3 flex-1">
           <div className="flex items-center gap-2 flex-1">
-            <span className="text-2xl">{flagA}</span>
+            <img
+              src={`https://flagcdn.com/w80/${flagA.toLowerCase()}.png`}
+              alt={teamA}
+              className="h-6 rounded shadow-sm"
+            />
             <span className="font-bold text-sm text-foreground">{teamA}</span>
           </div>
           <div className="flex flex-col items-center px-3">
@@ -62,7 +66,11 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
           </div>
           <div className="flex items-center gap-2 flex-1 justify-end">
             <span className="font-bold text-sm text-foreground">{teamB}</span>
-            <span className="text-2xl">{flagB}</span>
+            <img
+              src={`https://flagcdn.com/w80/${flagB.toLowerCase()}.png`}
+              alt={teamB}
+              className="h-6 rounded shadow-sm"
+            />
           </div>
         </div>
         <div className="flex items-center gap-2 ml-3">
