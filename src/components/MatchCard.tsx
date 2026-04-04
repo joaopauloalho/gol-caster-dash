@@ -97,7 +97,7 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
             </label>
             <div className="flex items-center justify-center gap-3">
               <div className="flex items-center gap-2">
-                <span className="text-lg">{flagA}</span>
+                <img src={`https://flagcdn.com/w80/${flagA.toLowerCase()}.png`} alt={teamA} className="h-5 rounded shadow-sm" />
                 <input
                   type="number"
                   min={0}
