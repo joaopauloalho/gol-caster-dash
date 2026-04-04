@@ -119,7 +119,7 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
                   className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                   placeholder="0"
                 />
-                <span className="text-lg">{flagB}</span>
+                <img src={`https://flagcdn.com/w80/${flagB.toLowerCase()}.png`} alt={teamB} className="h-5 rounded shadow-sm" />
               </div>
             </div>
           </div>
