@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Check, Zap, Lock } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, Zap } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +19,9 @@ interface MatchCardProps {
 }
 
 const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber }: MatchCardProps) => {
+  const { user } = useAuth();
+  const { isActive } = useSubscription();
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [scoreA, setScoreA] = useState<number | "">("");
   const [scoreB, setScoreB] = useState<number | "">("");
@@ -60,7 +63,6 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
 
   return (
     <div className={`card-match rounded-xl overflow-hidden transition-all duration-300 ${expanded ? "ring-1 ring-primary/30" : ""}`}>
-      {/* Header */}
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between p-4"
@@ -100,12 +102,9 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
         </div>
       </button>
 
-      {/* Expanded Content */}
       {expanded && (
         <div className="px-4 pb-4 space-y-4 animate-slide-up">
           <div className="h-px bg-border" />
-
-          {/* Placar */}
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
               Placar Exato <span className="text-primary">(25 pts)</span>
@@ -113,136 +112,58 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
             <div className="flex items-center justify-center gap-3">
               <div className="flex items-center gap-2">
                 <img src={`https://flagcdn.com/w80/${flagA.toLowerCase()}.png`} alt={teamA} className="h-5 rounded shadow-sm" />
-                <input
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={scoreA}
-                  onChange={(e) => setScoreA(e.target.value === "" ? "" : parseInt(e.target.value))}
-                  className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                  placeholder="0"
-                />
+                <input type="number" min={0} max={20} value={scoreA} onChange={(e) => setScoreA(e.target.value === "" ? "" : parseInt(e.target.value))} className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="0" />
               </div>
               <span className="text-muted-foreground font-bold text-lg">×</span>
               <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={scoreB}
-                  onChange={(e) => setScoreB(e.target.value === "" ? "" : parseInt(e.target.value))}
-                  className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
-                  placeholder="0"
-                />
+                <input type="number" min={0} max={20} value={scoreB} onChange={(e) => setScoreB(e.target.value === "" ? "" : parseInt(e.target.value))} className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="0" />
                 <img src={`https://flagcdn.com/w80/${flagB.toLowerCase()}.png`} alt={teamB} className="h-5 rounded shadow-sm" />
               </div>
             </div>
           </div>
 
-          {/* Vencedor */}
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
               Vencedor / Empate <span className="text-primary">(10 pts)</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {[
-                { key: "A" as const, label: teamA },
-                { key: "X" as const, label: "Empate" },
-                { key: "B" as const, label: teamB },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setWinner(winner === key ? null : key)}
-                  className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                    winner === key
-                      ? "bg-primary text-primary-foreground shadow-lg"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
+              {([{ key: "A" as const, label: teamA }, { key: "X" as const, label: "Empate" }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
+                <button key={key} onClick={() => setWinner(winner === key ? null : key)} className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${winner === key ? "bg-primary text-primary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{label}</button>
               ))}
             </div>
           </div>
 
-          {/* Toggles Grid */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Gol 1º Tempo */}
             <ToggleField label="Gol no 1º Tempo" points={5} value={goalFirstHalf} onChange={setGoalFirstHalf} />
             <ToggleField label="Gol no 2º Tempo" points={5} value={goalSecondHalf} onChange={setGoalSecondHalf} />
             <ToggleField label="Terá Expulsão?" points={7} value={redCard} onChange={setRedCard} />
             <ToggleField label="Terá Pênalti?" points={7} value={penalty} onChange={setPenalty} />
           </div>
 
-          {/* Quem marca primeiro */}
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
               Quem marca 1º? <span className="text-primary">(8 pts)</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {[
-                { key: "A" as const, label: teamA },
-                { key: "N" as const, label: "Ninguém" },
-                { key: "B" as const, label: teamB },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setFirstGoal(firstGoal === key ? null : key)}
-                  className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                    firstGoal === key
-                      ? "bg-secondary text-secondary-foreground shadow-lg"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
+              {([{ key: "A" as const, label: teamA }, { key: "N" as const, label: "Ninguém" }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
+                <button key={key} onClick={() => setFirstGoal(firstGoal === key ? null : key)} className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${firstGoal === key ? "bg-secondary text-secondary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{label}</button>
               ))}
             </div>
           </div>
 
-          {/* Mais Posse */}
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
               Mais Posse de Bola <span className="text-primary">(5 pts)</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
-              {[
-                { key: "A" as const, label: teamA },
-                { key: "B" as const, label: teamB },
-              ].map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setPossession(possession === key ? null : key)}
-                  className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${
-                    possession === key
-                      ? "bg-secondary text-secondary-foreground shadow-lg"
-                      : "bg-muted text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {label}
-                </button>
+              {([{ key: "A" as const, label: teamA }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
+                <button key={key} onClick={() => setPossession(possession === key ? null : key)} className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${possession === key ? "bg-secondary text-secondary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{label}</button>
               ))}
             </div>
           </div>
 
-          {/* Save Button */}
-          <button
-            onClick={handleSave}
-            className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
-              saved
-                ? "bg-secondary text-secondary-foreground"
-                : "btn-gold"
-            }`}
-          >
-            {saved ? (
-              <>
-                <Check className="w-4 h-4" /> Palpite Salvo!
-              </>
-            ) : (
-              <>
-                <Zap className="w-4 h-4" /> Salvar Palpite
-              </>
-            )}
+          <button onClick={handleSave} className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${saved ? "bg-secondary text-secondary-foreground" : "btn-gold"}`}>
+            {saved ? (<><Check className="w-4 h-4" /> Palpite Salvo!</>) : (<><Zap className="w-4 h-4" /> Salvar Palpite</>)}
           </button>
 
           {filledCount === 8 && (
@@ -269,22 +190,8 @@ const ToggleField = ({ label, points, value, onChange }: ToggleFieldProps) => (
       {label} <span className="text-primary">({points} pts)</span>
     </label>
     <div className="flex gap-2">
-      <button
-        onClick={() => onChange(value === true ? null : true)}
-        className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${
-          value === true ? "bg-secondary text-secondary-foreground" : "bg-muted text-muted-foreground"
-        }`}
-      >
-        Sim
-      </button>
-      <button
-        onClick={() => onChange(value === false ? null : false)}
-        className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${
-          value === false ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"
-        }`}
-      >
-        Não
-      </button>
+      <button onClick={() => onChange(value === true ? null : true)} className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${value === true ? "bg-secondary text-secondary-foreground" : "bg-muted text-muted-foreground"}`}>Sim</button>
+      <button onClick={() => onChange(value === false ? null : false)} className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${value === false ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"}`}>Não</button>
     </div>
   </div>
 );
