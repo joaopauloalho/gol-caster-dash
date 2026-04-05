@@ -43,6 +43,17 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
   ].filter(Boolean).length;
 
   const handleSave = () => {
+    if (!user) {
+      toast.error("Faça login para salvar palpites.");
+      navigate("/auth");
+      return;
+    }
+    if (!isActive) {
+      toast.error("Assine o plano para participar da Copa!", {
+        action: { label: "Ver Planos", onClick: () => navigate("/planos") },
+      });
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
