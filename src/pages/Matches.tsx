@@ -1,11 +1,21 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { Lock } from "lucide-react";
 import MatchCard from "@/components/MatchCard";
 import { phases, fetchMatchesByPhase, groupByDate, type PhaseKey, type MatchData } from "@/data/matches";
+import { useAuth } from "@/hooks/useAuth";
+import { useParticipant } from "@/hooks/useParticipant";
+import { Button } from "@/components/ui/button";
 
 const Matches = () => {
   const [activePhase, setActivePhase] = useState<PhaseKey>("Grupos");
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { hasPaid, loading: partLoading } = useParticipant();
+  const navigate = useNavigate();
+
+  const showBlur = !user || !hasPaid;
 
   useEffect(() => {
     setLoading(true);
@@ -40,26 +50,42 @@ const Matches = () => {
         ))}
       </div>
 
-      <div className="px-4 space-y-6">
-        {loading ? (
-          <div className="text-center py-12 text-muted-foreground text-sm">Carregando jogos...</div>
-        ) : matchDays.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground text-sm">Nenhum jogo encontrado</div>
-        ) : (
-          matchDays.map(({ date, matches }) => (
-            <div key={date}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-primary" />
-                <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{date}</h2>
-              </div>
-              <div className="space-y-3">
-                {matches.map((match) => (
-                  <MatchCard key={match.matchNumber} {...match} />
-                ))}
-              </div>
-            </div>
-          ))
+      <div className="relative px-4 space-y-6">
+        {/* Blur overlay */}
+        {showBlur && !loading && !partLoading && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center backdrop-blur-md bg-background/40 rounded-xl">
+            <Lock className="w-10 h-10 text-primary mb-3" />
+            <h3 className="text-lg font-black text-foreground mb-1">Área Restrita</h3>
+            <p className="text-sm text-muted-foreground text-center max-w-xs mb-4">
+              Assine o plano para desbloquear seus palpites e concorrer aos prêmios.
+            </p>
+            <Button onClick={() => navigate("/")} className="btn-gold rounded-xl font-bold">
+              Inscrever-se Agora
+            </Button>
+          </div>
         )}
+
+        <div className={showBlur && !loading ? "filter blur-sm pointer-events-none select-none" : ""}>
+          {loading ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">Carregando jogos...</div>
+          ) : matchDays.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground text-sm">Nenhum jogo encontrado</div>
+          ) : (
+            matchDays.map(({ date, matches }) => (
+              <div key={date}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-2 h-2 rounded-full bg-primary" />
+                  <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">{date}</h2>
+                </div>
+                <div className="space-y-3">
+                  {matches.map((match) => (
+                    <MatchCard key={match.matchNumber} {...match} />
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );
