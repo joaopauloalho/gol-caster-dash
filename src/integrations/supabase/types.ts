@@ -59,6 +59,48 @@ export type Database = {
         }
         Relationships: []
       }
+      participants: {
+        Row: {
+          amount: number
+          birth_date: string
+          cpf: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          payment_confirmed: boolean
+          plan: string
+          user_id: string
+          whatsapp: string
+        }
+        Insert: {
+          amount?: number
+          birth_date: string
+          cpf: string
+          created_at?: string
+          email: string
+          full_name: string
+          id?: string
+          payment_confirmed?: boolean
+          plan?: string
+          user_id: string
+          whatsapp: string
+        }
+        Update: {
+          amount?: number
+          birth_date?: string
+          cpf?: string
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          payment_confirmed?: boolean
+          plan?: string
+          user_id?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
