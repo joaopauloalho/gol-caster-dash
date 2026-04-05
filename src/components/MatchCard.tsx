@@ -1,5 +1,9 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Check, Zap } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, Zap, Lock } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface MatchCardProps {
   teamA: string;
