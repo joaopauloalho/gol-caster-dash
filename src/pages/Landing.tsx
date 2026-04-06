@@ -1,12 +1,13 @@
-import { useState } from "react";
-import { Trophy, Zap, ChevronRight, Shield, CreditCard, QrCode, Users, Star } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Trophy, Zap, ChevronRight, Shield, CreditCard, QrCode, Users, Star, MapPin, Share2, MessageCircle } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, formatPhone, validateCPF, calculateAge } from "@/lib/cpf";
 import { toast } from "sonner";
+import { BRAZILIAN_STATES, type BrazilianState } from "@/lib/states";
 
 const prizes = [
   { emoji: "🚗", label: "Toyota Hilux 0km", highlight: true },
@@ -27,6 +28,7 @@ type Step = "info" | "payment" | "success";
 
 const Landing = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState<Step>("info");
 
   // Form fields
@@ -36,14 +38,19 @@ const Landing = () => {
   const [cpf, setCpf] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [password, setPassword] = useState("");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+
+  // Referral
+  const referralCode = searchParams.get("ref") || "";
 
   // Payment
   const [selectedPlan, setSelectedPlan] = useState<"avista" | "parcelado">("avista");
   const [processing, setProcessing] = useState(false);
 
   const handleNextStep = () => {
-    if (!fullName.trim() || !email.trim() || !whatsapp.trim() || !cpf.trim() || !birthDate || !password) {
-      toast.error("Preencha todos os campos.");
+    if (!fullName.trim() || !email.trim() || !whatsapp.trim() || !cpf.trim() || !birthDate || !password || !state || !city.trim()) {
+      toast.error("Preencha todos os campos, incluindo Estado e Cidade.");
       return;
     }
     if (!validateCPF(cpf)) {
@@ -65,7 +72,6 @@ const Landing = () => {
   const handlePay = async () => {
     setProcessing(true);
     try {
-      // 1. Create account
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -76,7 +82,19 @@ const Landing = () => {
       const userId = authData.user?.id;
       if (!userId) throw new Error("Erro ao criar conta.");
 
-      // 2. Save participant
+      // Find referrer if code provided
+      let referredById: string | null = null;
+      if (referralCode) {
+        const { data: referrer } = await supabase
+          .from("participants")
+          .select("id")
+          .eq("referral_code", referralCode)
+          .maybeSingle();
+        if (referrer) {
+          referredById = referrer.id;
+        }
+      }
+
       const { error: partError } = await supabase.from("participants").insert({
         user_id: userId,
         full_name: fullName.trim(),
@@ -87,10 +105,17 @@ const Landing = () => {
         payment_confirmed: true,
         plan: selectedPlan === "avista" ? "pro-avista" : "pro-parcelado",
         amount: selectedPlan === "avista" ? 25000 : 30000,
+        state,
+        city: city.trim(),
+        ...(referredById ? { referred_by: referredById } : {}),
       });
       if (partError) throw partError;
 
-      // 3. Also create subscription for backward compat
+      // Give referrer bonus points
+      if (referredById) {
+        await supabase.rpc("increment_bonus_points" as any, { participant_id: referredById, points: 50 }).catch(() => {});
+      }
+
       await supabase.from("subscriptions").insert({
         user_id: userId,
         plan: selectedPlan === "avista" ? "pro-avista" : "pro-parcelado",
@@ -195,6 +220,25 @@ const Landing = () => {
                   <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Data de Nascimento</label>
                   <Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="text-foreground" />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Estado</label>
+                    <select
+                      value={state}
+                      onChange={(e) => setState(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <option value="">Selecione</option>
+                      {BRAZILIAN_STATES.map((s) => (
+                        <option key={s.uf} value={s.uf}>{s.uf} - {s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Cidade</label>
+                    <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="São Paulo" />
+                  </div>
+                </div>
               </div>
 
               <Button onClick={handleNextStep} className="w-full btn-gold py-3 rounded-xl font-black text-sm h-auto">
@@ -295,7 +339,7 @@ const Landing = () => {
         <h2 className="text-lg font-black text-foreground mb-4">⚡ Como Funciona</h2>
         <div className="space-y-3">
           {[
-            { step: "1", title: "Preencha seus dados", desc: "Nome, CPF, WhatsApp e e-mail" },
+            { step: "1", title: "Preencha seus dados", desc: "Nome, CPF, WhatsApp, Estado e Cidade" },
             { step: "2", title: "Escolha o pagamento", desc: "PIX à vista ou parcelado no cartão" },
             { step: "3", title: "Faça 8 palpites por jogo", desc: "Placar, goleador, cartões e mais" },
             { step: "4", title: "Suba no ranking", desc: "Top 1 leva a Hilux!" },
