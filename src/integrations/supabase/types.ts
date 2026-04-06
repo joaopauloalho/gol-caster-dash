@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          admin_id: string
+          created_at: string
+          id: string
+          invite_code: string
+          name: string
+        }
+        Insert: {
+          admin_id: string
+          created_at?: string
+          id?: string
+          invite_code?: string
+          name: string
+        }
+        Update: {
+          admin_id?: string
+          created_at?: string
+          id?: string
+          invite_code?: string
+          name?: string
+        }
+        Relationships: []
+      }
       matches: {
         Row: {
           city: string
@@ -62,7 +115,10 @@ export type Database = {
       participants: {
         Row: {
           amount: number
+          avatar_url: string | null
           birth_date: string
+          bonus_points: number
+          city: string
           cpf: string
           created_at: string
           email: string
@@ -70,12 +126,18 @@ export type Database = {
           id: string
           payment_confirmed: boolean
           plan: string
+          referral_code: string
+          referred_by: string | null
+          state: string
           user_id: string
           whatsapp: string
         }
         Insert: {
           amount?: number
+          avatar_url?: string | null
           birth_date: string
+          bonus_points?: number
+          city?: string
           cpf: string
           created_at?: string
           email: string
@@ -83,12 +145,18 @@ export type Database = {
           id?: string
           payment_confirmed?: boolean
           plan?: string
+          referral_code?: string
+          referred_by?: string | null
+          state?: string
           user_id: string
           whatsapp: string
         }
         Update: {
           amount?: number
+          avatar_url?: string | null
           birth_date?: string
+          bonus_points?: number
+          city?: string
           cpf?: string
           created_at?: string
           email?: string
@@ -96,10 +164,21 @@ export type Database = {
           id?: string
           payment_confirmed?: boolean
           plan?: string
+          referral_code?: string
+          referred_by?: string | null
+          state?: string
           user_id?: string
           whatsapp?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "participants_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "participants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

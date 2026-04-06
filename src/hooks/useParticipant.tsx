@@ -6,6 +6,10 @@ interface Participant {
   id: string;
   payment_confirmed: boolean;
   plan: string;
+  state: string;
+  city: string;
+  referral_code: string;
+  bonus_points: number;
 }
 
 export const useParticipant = () => {
@@ -23,10 +27,10 @@ export const useParticipant = () => {
     const fetch = async () => {
       const { data } = await supabase
         .from("participants")
-        .select("id, payment_confirmed, plan")
+        .select("id, payment_confirmed, plan, state, city, referral_code, bonus_points")
         .eq("user_id", user.id)
         .maybeSingle();
-      setParticipant(data);
+      setParticipant(data as Participant | null);
       setLoading(false);
     };
     fetch();

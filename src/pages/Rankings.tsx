@@ -1,18 +1,17 @@
-import { useState } from "react";
-import { Trophy, TrendingUp, TrendingDown, Minus, Crown, Medal, Award } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Trophy, TrendingUp, TrendingDown, Minus, Crown, Medal, Award, MapPin, Users, Share2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { useParticipant } from "@/hooks/useParticipant";
 
-const mockRanking = [
-  { pos: 1, name: "Carlos Silva", points: 847, change: 2, exactScores: 12, gabaritos: 2 },
-  { pos: 2, name: "Ana Rodrigues", points: 823, change: -1, exactScores: 11, gabaritos: 1 },
-  { pos: 3, name: "João Pedro", points: 801, change: 1, exactScores: 10, gabaritos: 2 },
-  { pos: 4, name: "Maria Santos", points: 798, change: 0, exactScores: 9, gabaritos: 1 },
-  { pos: 5, name: "Lucas Oliveira", points: 785, change: 3, exactScores: 8, gabaritos: 0 },
-  { pos: 6, name: "Fernanda Lima", points: 770, change: -2, exactScores: 8, gabaritos: 1 },
-  { pos: 7, name: "Rafael Costa", points: 756, change: 0, exactScores: 7, gabaritos: 0 },
-  { pos: 8, name: "Juliana Alves", points: 742, change: 1, exactScores: 7, gabaritos: 1 },
-  { pos: 9, name: "Thiago Mendes", points: 730, change: -1, exactScores: 6, gabaritos: 0 },
-  { pos: 10, name: "Camila Souza", points: 715, change: 4, exactScores: 6, gabaritos: 0 },
-];
+interface RankingUser {
+  id: string;
+  full_name: string;
+  city: string;
+  state: string;
+  bonus_points: number;
+  avatar_url: string | null;
+}
 
 const PosIcon = ({ pos }: { pos: number }) => {
   if (pos === 1) return <Crown className="w-5 h-5 text-primary" />;
@@ -21,14 +20,50 @@ const PosIcon = ({ pos }: { pos: number }) => {
   return <span className="text-sm font-black text-muted-foreground w-5 text-center">{pos}</span>;
 };
 
-const ChangeIndicator = ({ change }: { change: number }) => {
-  if (change > 0) return <span className="flex items-center gap-0.5 text-[10px] font-bold text-secondary"><TrendingUp className="w-3 h-3" />+{change}</span>;
-  if (change < 0) return <span className="flex items-center gap-0.5 text-[10px] font-bold text-destructive"><TrendingDown className="w-3 h-3" />{change}</span>;
-  return <Minus className="w-3 h-3 text-muted-foreground" />;
-};
+type FilterTab = "geral" | "estado" | "cidade" | "grupo";
 
 const Rankings = () => {
-  const [tab, setTab] = useState<"geral" | "diario">("geral");
+  const [tab, setTab] = useState<FilterTab>("geral");
+  const [participants, setParticipants] = useState<RankingUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { participant } = useParticipant();
+
+  useEffect(() => {
+    const fetchRanking = async () => {
+      setLoading(true);
+      let query = supabase
+        .from("participants")
+        .select("id, full_name, city, state, bonus_points, avatar_url")
+        .eq("payment_confirmed", true)
+        .order("bonus_points", { ascending: false })
+        .limit(50);
+
+      if (tab === "estado" && participant?.state) {
+        query = query.eq("state", participant.state);
+      }
+      if (tab === "cidade" && participant?.city && participant?.state) {
+        query = query.eq("state", participant.state).eq("city", participant.city);
+      }
+
+      const { data } = await query;
+      setParticipants(data || []);
+      setLoading(false);
+    };
+    fetchRanking();
+  }, [tab, participant]);
+
+  const myPos = participant
+    ? participants.findIndex((p) => p.id === participant.id) + 1
+    : 0;
+  const leaderPoints = participants[0]?.bonus_points || 0;
+
+  const tabs: { key: FilterTab; label: string; icon: React.ReactNode }[] = [
+    { key: "geral", label: "Geral", icon: "🏆" },
+    { key: "estado", label: "Meu Estado", icon: <MapPin className="w-3 h-3" /> },
+    { key: "cidade", label: "Minha Cidade", icon: <MapPin className="w-3 h-3" /> },
+    { key: "grupo", label: "Grupo", icon: <Users className="w-3 h-3" /> },
+  ];
 
   return (
     <div className="min-h-screen pb-24 pt-4">
@@ -38,80 +73,102 @@ const Rankings = () => {
       </div>
 
       {/* Your Position */}
-      <div className="px-4 mb-4">
-        <div className="bg-glass-gold rounded-xl p-4 flex items-center justify-between">
-          <div>
-            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Sua Posição</div>
-            <div className="text-3xl font-black text-primary">#42</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Seus Pontos</div>
-            <div className="text-3xl font-black text-foreground">632</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] text-muted-foreground uppercase font-semibold">Até o Líder</div>
-            <div className="text-xl font-black text-destructive">-215</div>
+      {participant && (
+        <div className="px-4 mb-4">
+          <div className="bg-glass-gold rounded-xl p-4 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Sua Posição</div>
+              <div className="text-3xl font-black text-primary">#{myPos || "—"}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Seus Pontos</div>
+              <div className="text-3xl font-black text-foreground">{participant.bonus_points}</div>
+            </div>
+            <div className="text-right">
+              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Até o Líder</div>
+              <div className="text-xl font-black text-destructive">
+                {myPos > 0 ? `-${leaderPoints - (participant.bonus_points)}` : "—"}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Tabs */}
-      <div className="flex gap-2 px-4 mb-4">
-        {(["geral", "diario"] as const).map((t) => (
+      <div className="flex gap-1.5 px-4 mb-4 overflow-x-auto scrollbar-hide">
+        {tabs.map((t) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`px-5 py-2 rounded-full text-xs font-bold transition-all ${
-              tab === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-1 px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all ${
+              tab === t.key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
             }`}
           >
-            {t === "geral" ? "🏆 Geral" : "📅 Diário"}
+            {t.icon} {t.label}
           </button>
         ))}
       </div>
 
-      {/* Top 3 Podium */}
-      <div className="px-4 mb-4">
-        <div className="flex items-end justify-center gap-2">
-          {[mockRanking[1], mockRanking[0], mockRanking[2]].map((user, i) => {
-            const heights = ["h-20", "h-28", "h-16"];
-            const order = [1, 0, 2];
-            return (
-              <div key={user.pos} className="flex flex-col items-center flex-1">
-                <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-foreground mb-1">
-                  {user.name.charAt(0)}
-                </div>
-                <span className="text-[10px] font-bold text-foreground text-center truncate w-full">{user.name.split(" ")[0]}</span>
-                <span className="text-[10px] font-bold text-primary">{user.points}</span>
-                <div className={`w-full ${heights[i]} rounded-t-lg mt-1 flex items-center justify-center ${
-                  order[i] === 0 ? "bg-primary/20 border border-primary/30" : "bg-muted"
-                }`}>
-                  <PosIcon pos={user.pos} />
-                </div>
-              </div>
-            );
-          })}
+      {loading ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">Carregando ranking...</div>
+      ) : participants.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground text-sm">
+          {tab === "grupo" ? "Entre em um grupo para ver o ranking" : "Nenhum participante encontrado"}
         </div>
-      </div>
-
-      {/* List */}
-      <div className="px-4 space-y-2">
-        {mockRanking.slice(3).map((user) => (
-          <div key={user.pos} className="bg-glass rounded-xl p-3 flex items-center gap-3">
-            <PosIcon pos={user.pos} />
-            <div className="flex-1 min-w-0">
-              <div className="font-bold text-sm text-foreground truncate">{user.name}</div>
-              <div className="text-[10px] text-muted-foreground">
-                {user.exactScores} exatos · {user.gabaritos} gabaritos
+      ) : (
+        <>
+          {/* Top 3 Podium */}
+          {participants.length >= 3 && (
+            <div className="px-4 mb-4">
+              <div className="flex items-end justify-center gap-2">
+                {[participants[1], participants[0], participants[2]].map((p, i) => {
+                  const heights = ["h-20", "h-28", "h-16"];
+                  const posNum = i === 0 ? 2 : i === 1 ? 1 : 3;
+                  return (
+                    <div key={p.id} className="flex flex-col items-center flex-1">
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-foreground mb-1">
+                        {p.full_name.charAt(0)}
+                      </div>
+                      <span className="text-[10px] font-bold text-foreground text-center truncate w-full">
+                        {p.full_name.split(" ")[0]}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{p.city}/{p.state}</span>
+                      <span className="text-[10px] font-bold text-primary">{p.bonus_points} pts</span>
+                      <div className={`w-full ${heights[i]} rounded-t-lg mt-1 flex items-center justify-center ${
+                        posNum === 1 ? "bg-primary/20 border border-primary/30" : "bg-muted"
+                      }`}>
+                        <PosIcon pos={posNum} />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-            <div className="text-right">
-              <div className="font-black text-sm text-foreground">{user.points}</div>
-              <ChangeIndicator change={user.change} />
-            </div>
+          )}
+
+          {/* List */}
+          <div className="px-4 space-y-2">
+            {participants.slice(3).map((p, idx) => (
+              <div key={p.id} className="bg-glass rounded-xl p-3 flex items-center gap-3">
+                <PosIcon pos={idx + 4} />
+                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-foreground">
+                  {p.full_name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm text-foreground truncate">{p.full_name}</div>
+                  <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-2.5 h-2.5" /> {p.city}/{p.state}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-black text-sm text-foreground">{p.bonus_points}</div>
+                  <div className="text-[10px] text-muted-foreground">pts</div>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 };
