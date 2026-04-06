@@ -113,7 +113,11 @@ const Landing = () => {
 
       // Give referrer bonus points
       if (referredById) {
-        await supabase.rpc("increment_bonus_points" as any, { participant_id: referredById, points: 50 }).catch(() => {});
+        await supabase
+          .from("participants")
+          .update({ bonus_points: 50 } as any)
+          .eq("id", referredById)
+          .then(() => {});
       }
 
       await supabase.from("subscriptions").insert({
