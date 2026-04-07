@@ -168,3 +168,12 @@
 .animate-float {
   animation: float 3s ease-in-out infinite;
 }
+
+@keyframes shiny-slide {
+  from { transform: translateX(-500%); }
+  to { transform: translateX(500%); }
+}
+
+.animate-shiny-slide {
+  animation: shiny-slide 3s infinite;
+}
