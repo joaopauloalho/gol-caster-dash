@@ -15,7 +15,7 @@ const Matches = () => {
   const { hasPaid, loading: partLoading } = useParticipant();
   const navigate = useNavigate();
 
-  const showBlur = !user || !hasPaid;
+  const showBlur = false; // TODO: restaurar para !user || !hasPaid após testes
 
   useEffect(() => {
     setLoading(true);
