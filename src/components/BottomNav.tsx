@@ -1,9 +1,10 @@
-import { Home, Target, Trophy, BarChart3, Users, User } from "lucide-react";
+import { Home, Target, Trophy, BarChart3, Users, User, Crosshair } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const navItems = [
   { icon: Home, label: "Início", path: "/" },
   { icon: Target, label: "Jogos", path: "/jogos" },
+  { icon: Crosshair, label: "Long Term", path: "/long-term" },
   { icon: Users, label: "Grupos", path: "/grupos" },
   { icon: BarChart3, label: "Rankings", path: "/rankings" },
   { icon: User, label: "Perfil", path: "/perfil" },
