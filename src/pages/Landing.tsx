@@ -9,6 +9,8 @@ import { formatCPF, formatPhone, validateCPF, calculateAge } from "@/lib/cpf";
 import { toast } from "sonner";
 import { BRAZILIAN_STATES, type BrazilianState } from "@/lib/states";
 import { RetroGrid } from "@/components/ui/retro-grid";
+import { Marquee } from "@/components/ui/marquee";
+import { cn } from "@/lib/utils";
 
 const prizes = [
   { emoji: "🚗", label: "Toyota Hilux 0km", highlight: true },
@@ -166,22 +168,36 @@ const Landing = () => {
         ))}
       </div>
 
-      {/* Resto do conteúdo... */}
-      <div className="px-4 mt-6 max-w-lg mx-auto">
-        <h2 className="text-lg font-black text-foreground mb-3">🏆 Premiação</h2>
-        <div className="space-y-2">
+      {/* Seção de Prêmios com Marquee Infinito */}
+      <div className="mt-10 overflow-hidden">
+        <h2 className="text-lg font-black text-foreground mb-4 px-4 max-w-lg mx-auto flex items-center gap-2">
+          🏆 Prêmios em Jogo
+        </h2>
+        <Marquee pauseOnHover className="[--duration:30s] py-4 bg-black/20 border-y border-border/50">
           {prizes.map(({ emoji, label, highlight }) => (
-            <div key={label} className={`flex items-center gap-3 p-3 rounded-xl ${highlight ? "bg-primary/10 border border-primary/20" : "bg-card border border-border"}`}>
-              <span className="text-2xl">{emoji}</span>
-              <span className={`font-bold text-sm ${highlight ? "text-primary" : "text-foreground"}`}>{label}</span>
-              {highlight && (
-                <span className="ml-auto text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                  PRÊMIO PRINCIPAL
-                </span>
+            <div 
+              key={label} 
+              className={cn(
+                "flex items-center gap-4 px-6 py-4 rounded-2xl mx-2 min-w-[260px] transition-all",
+                highlight 
+                  ? "bg-primary/10 border border-primary/30 shadow-[0_0_20px_rgba(255,215,0,0.1)]" 
+                  : "bg-card/50 border border-border"
               )}
+            >
+              <span className="text-4xl">{emoji}</span>
+              <div className="flex flex-col">
+                <span className={cn("font-black text-base leading-tight", highlight ? "text-primary" : "text-foreground")}>
+                  {label}
+                </span>
+                {highlight && (
+                  <span className="text-[10px] font-bold text-primary/80 uppercase tracking-widest mt-1">
+                    Prêmio Principal
+                  </span>
+                )}
+              </div>
             </div>
           ))}
-        </div>
+        </Marquee>
       </div>
 
       {/* Form / Payment / Success Sections */}
