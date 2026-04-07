@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, formatPhone, validateCPF, calculateAge } from "@/lib/cpf";
 import { toast } from "sonner";
 import { BRAZILIAN_STATES, type BrazilianState } from "@/lib/states";
+import { RetroGrid } from "@/components/ui/retro-grid";
 
 const prizes = [
   { emoji: "🚗", label: "Toyota Hilux 0km", highlight: true },
@@ -82,7 +83,6 @@ const Landing = () => {
       const userId = authData.user?.id;
       if (!userId) throw new Error("Erro ao criar conta.");
 
-      // Find referrer if code provided
       let referredById: string | null = null;
       if (referralCode) {
         const { data: referrer } = await supabase
@@ -111,13 +111,11 @@ const Landing = () => {
       });
       if (partError) throw partError;
 
-      // Give referrer bonus points
       if (referredById) {
         await supabase
           .from("participants")
           .update({ bonus_points: 50 } as any)
-          .eq("id", referredById)
-          .then(() => {});
+          .eq("id", referredById);
       }
 
       await supabase.from("subscriptions").insert({
@@ -136,13 +134,11 @@ const Landing = () => {
   };
 
   return (
-    <div className="min-h-screen pb-20">
-      {/* Hero */}
-      <div className="relative overflow-hidden" style={{ background: "var(--gradient-hero)" }}>
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-10 left-10 w-32 h-32 rounded-full bg-primary blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-40 h-40 rounded-full bg-secondary blur-3xl" />
-        </div>
+    <div className="min-h-screen pb-20 bg-background">
+      {/* Hero Section com RetroGrid */}
+      <div className="relative overflow-hidden min-h-[400px] flex flex-col items-center justify-center" style={{ background: "var(--gradient-hero)" }}>
+        <RetroGrid className="opacity-40" />
+        
         <div className="relative z-10 px-4 pt-12 pb-8 text-center max-w-lg mx-auto">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-4">
             <Zap className="w-3 h-3" /> Copa do Mundo 2026
@@ -162,7 +158,7 @@ const Landing = () => {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-2 px-4 -mt-4 relative z-10 max-w-lg mx-auto">
         {stats.map(({ icon: Icon, value, label }) => (
-          <div key={label} className="bg-card border border-border rounded-xl p-3 text-center">
+          <div key={label} className="bg-card border border-border rounded-xl p-3 text-center shadow-lg">
             <Icon className="w-4 h-4 mx-auto text-primary mb-1" />
             <div className="text-lg font-black text-foreground">{value}</div>
             <div className="text-[10px] text-muted-foreground">{label}</div>
@@ -170,7 +166,7 @@ const Landing = () => {
         ))}
       </div>
 
-      {/* Prizes */}
+      {/* Resto do conteúdo... */}
       <div className="px-4 mt-6 max-w-lg mx-auto">
         <h2 className="text-lg font-black text-foreground mb-3">🏆 Premiação</h2>
         <div className="space-y-2">
@@ -188,10 +184,10 @@ const Landing = () => {
         </div>
       </div>
 
-      {/* Form / Payment / Success */}
+      {/* Form / Payment / Success Sections */}
       <div className="px-4 mt-8 max-w-lg mx-auto">
         {step === "info" && (
-          <Card className="border-primary/20">
+          <Card className="border-primary/20 shadow-xl">
             <CardContent className="pt-6 space-y-4">
               <div className="text-center mb-2">
                 <Shield className="w-8 h-8 mx-auto text-primary mb-2" />
@@ -200,53 +196,29 @@ const Landing = () => {
               </div>
 
               <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Nome Completo</label>
-                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="João da Silva" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">E-mail</label>
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seu@email.com" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Senha</label>
-                  <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 6 caracteres" minLength={6} />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">WhatsApp</label>
-                  <Input value={whatsapp} onChange={(e) => setWhatsapp(formatPhone(e.target.value))} placeholder="(11) 99999-9999" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">CPF</label>
-                  <Input value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))} placeholder="000.000.000-00" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Data de Nascimento</label>
-                  <Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="text-foreground" />
-                </div>
+                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nome Completo" />
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" />
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha (min. 6 caracteres)" />
+                <Input value={whatsapp} onChange={(e) => setWhatsapp(formatPhone(e.target.value))} placeholder="WhatsApp" />
+                <Input value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))} placeholder="CPF" />
+                <Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Estado</label>
-                    <select
-                      value={state}
-                      onChange={(e) => setState(e.target.value)}
-                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    >
-                      <option value="">Selecione</option>
-                      {BRAZILIAN_STATES.map((s) => (
-                        <option key={s.uf} value={s.uf}>{s.uf} - {s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1">Cidade</label>
-                    <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="São Paulo" />
-                  </div>
+                  <select
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Estado</option>
+                    {BRAZILIAN_STATES.map((s) => (
+                      <option key={s.uf} value={s.uf}>{s.uf}</option>
+                    ))}
+                  </select>
+                  <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Cidade" />
                 </div>
               </div>
 
-              <Button onClick={handleNextStep} className="w-full btn-gold py-3 rounded-xl font-black text-sm h-auto">
-                Continuar para Pagamento <ChevronRight className="w-4 h-4 ml-1" />
+              <Button onClick={handleNextStep} className="w-full btn-gold py-6 rounded-xl font-black text-sm h-auto">
+                Continuar <ChevronRight className="w-4 h-4 ml-1" />
               </Button>
             </CardContent>
           </Card>
@@ -257,126 +229,42 @@ const Landing = () => {
             <div className="text-center mb-2">
               <CreditCard className="w-8 h-8 mx-auto text-primary mb-2" />
               <h2 className="text-xl font-black text-foreground">Escolha seu Plano</h2>
-              <p className="text-xs text-muted-foreground">Selecione a forma de pagamento</p>
             </div>
 
-            <Card
-              className={`cursor-pointer transition-all ${selectedPlan === "avista" ? "ring-2 ring-primary border-primary" : "border-border hover:border-primary/50"}`}
-              onClick={() => setSelectedPlan("avista")}
-            >
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <QrCode className="w-4 h-4 text-primary" />
-                      <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">MELHOR PREÇO</span>
-                    </div>
-                    <div className="text-2xl font-black text-foreground">R$ 250<span className="text-sm font-bold text-muted-foreground">,00</span></div>
-                    <div className="text-xs text-muted-foreground">PIX ou Cartão — pagamento único</div>
-                  </div>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedPlan === "avista" ? "border-primary bg-primary" : "border-border"}`}>
-                    {selectedPlan === "avista" && <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />}
-                  </div>
+            <Card className={`cursor-pointer transition-all ${selectedPlan === "avista" ? "ring-2 ring-primary" : ""}`} onClick={() => setSelectedPlan("avista")}>
+              <CardContent className="pt-5 pb-4 flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-black">R$ 250,00</div>
+                  <div className="text-xs text-muted-foreground">PIX ou Cartão à vista</div>
                 </div>
+                {selectedPlan === "avista" && <Zap className="text-primary" />}
               </CardContent>
             </Card>
 
-            <Card
-              className={`cursor-pointer transition-all ${selectedPlan === "parcelado" ? "ring-2 ring-primary border-primary" : "border-border hover:border-primary/50"}`}
-              onClick={() => setSelectedPlan("parcelado")}
-            >
-              <CardContent className="pt-5 pb-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <CreditCard className="w-4 h-4 text-secondary" />
-                      <span className="text-xs font-bold text-secondary">PARCELADO</span>
-                    </div>
-                    <div className="text-2xl font-black text-foreground">3x R$ 100<span className="text-sm font-bold text-muted-foreground">,00</span></div>
-                    <div className="text-xs text-muted-foreground">Cartão de crédito — total R$ 300</div>
-                  </div>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${selectedPlan === "parcelado" ? "border-primary bg-primary" : "border-border"}`}>
-                    {selectedPlan === "parcelado" && <div className="w-2.5 h-2.5 rounded-full bg-primary-foreground" />}
-                  </div>
+            <Card className={`cursor-pointer transition-all ${selectedPlan === "parcelado" ? "ring-2 ring-primary" : ""}`} onClick={() => setSelectedPlan("parcelado")}>
+              <CardContent className="pt-5 pb-4 flex items-center justify-between">
+                <div>
+                  <div className="text-2xl font-black">3x R$ 100,00</div>
+                  <div className="text-xs text-muted-foreground">Cartão de Crédito</div>
                 </div>
+                {selectedPlan === "parcelado" && <Zap className="text-primary" />}
               </CardContent>
             </Card>
 
-            <Button
-              onClick={handlePay}
-              disabled={processing}
-              className="w-full btn-gold py-4 rounded-xl font-black text-base h-auto"
-            >
-              {processing ? "Processando..." : "💳 Pagar e Entrar no Jogo"}
+            <Button onClick={handlePay} disabled={processing} className="w-full btn-gold py-6 rounded-xl font-black text-base h-auto">
+              {processing ? "Processando..." : "💳 Pagar e Entrar"}
             </Button>
-
-            <button onClick={() => setStep("info")} className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors">
-              ← Voltar e editar dados
-            </button>
-
-            <p className="text-center text-[10px] text-muted-foreground">
-              🔒 Pagamento simulado para testes. Integração Stripe em breve.
-            </p>
           </div>
         )}
 
         {step === "success" && (
-          <Card className="border-secondary/30">
-            <CardContent className="pt-6 pb-6 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center mx-auto">
-                <Trophy className="w-8 h-8 text-secondary" />
-              </div>
-              <h2 className="text-xl font-black text-foreground">Pagamento Confirmado! 🎉</h2>
-              <p className="text-sm text-muted-foreground">
-                Verifique seu e-mail <strong className="text-foreground">{email}</strong> para ativar sua conta e liberar seus palpites.
-              </p>
-              <Button onClick={() => navigate("/auth")} className="btn-gold rounded-xl font-bold">
-                Ir para Login
-              </Button>
-            </CardContent>
+          <Card className="text-center p-8 space-y-4">
+            <Trophy className="w-12 h-12 text-secondary mx-auto" />
+            <h2 className="text-2xl font-black">Quase lá! 🎉</h2>
+            <p className="text-sm text-muted-foreground">Enviamos um e-mail para ativar sua conta.</p>
+            <Button onClick={() => navigate("/auth")} className="btn-gold w-full">Fazer Login</Button>
           </Card>
         )}
-      </div>
-
-      {/* How it works */}
-      <div className="px-4 mt-8 max-w-lg mx-auto">
-        <h2 className="text-lg font-black text-foreground mb-4">⚡ Como Funciona</h2>
-        <div className="space-y-3">
-          {[
-            { step: "1", title: "Preencha seus dados", desc: "Nome, CPF, WhatsApp, Estado e Cidade" },
-            { step: "2", title: "Escolha o pagamento", desc: "PIX à vista ou parcelado no cartão" },
-            { step: "3", title: "Faça 8 palpites por jogo", desc: "Placar, goleador, cartões e mais" },
-            { step: "4", title: "Suba no ranking", desc: "Top 1 leva a Hilux!" },
-          ].map(({ step, title, desc }) => (
-            <div key={step} className="flex items-center gap-4 bg-card border border-border rounded-xl p-4">
-              <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground font-black text-sm flex items-center justify-center flex-shrink-0">
-                {step}
-              </div>
-              <div>
-                <div className="font-bold text-sm text-foreground">{title}</div>
-                <div className="text-xs text-muted-foreground">{desc}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Multipliers */}
-      <div className="px-4 mt-8 max-w-lg mx-auto">
-        <h2 className="text-lg font-black text-foreground mb-4">🔥 Multiplicadores</h2>
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { phase: "Fase de Grupos", multi: "1.0x", color: "text-muted-foreground" },
-            { phase: "Oitavas/Quartas", multi: "2.5x", color: "text-secondary" },
-            { phase: "Semifinais", multi: "5.0x", color: "text-primary" },
-            { phase: "Grande Final", multi: "10x", color: "text-primary" },
-          ].map(({ phase, multi, color }) => (
-            <div key={phase} className="bg-card border border-border rounded-xl p-4 text-center">
-              <div className={`text-2xl font-black ${color}`}>{multi}</div>
-              <div className="text-[10px] text-muted-foreground mt-1">{phase}</div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
