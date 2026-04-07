@@ -1,9 +1,10 @@
-import { Home, Target, Trophy, BarChart3, Users, User } from "lucide-react";
+import { Home, Target, Trophy, BarChart3, Users, User, Crosshair } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 const navItems = [
   { icon: Home, label: "Início", path: "/" },
   { icon: Target, label: "Jogos", path: "/jogos" },
+  { icon: Crosshair, label: "Long Term", path: "/long-term" },
   { icon: Users, label: "Grupos", path: "/grupos" },
   { icon: BarChart3, label: "Rankings", path: "/rankings" },
   { icon: User, label: "Perfil", path: "/perfil" },
@@ -22,7 +23,7 @@ const BottomNav = () => {
             <button
               key={path}
               onClick={() => navigate(path)}
-              className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-200 ${
+              className={`flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg transition-all duration-200 min-w-0 ${
                 isActive
                   ? "text-primary scale-105"
                   : "text-muted-foreground hover:text-foreground"
