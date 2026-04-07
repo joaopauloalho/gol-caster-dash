@@ -1,89 +1,150 @@
-import { useState } from "react";
-import { Trophy, Zap, ChevronRight, Shield, CreditCard, Users, Star } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Trophy, Zap, ChevronRight, Shield, CreditCard, QrCode, Users, Star, MapPin, Share2, MessageCircle } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { formatCPF, formatPhone, validateCPF, calculateAge } from "@/lib/cpf";
+import { toast } from "sonner";
+import { BRAZILIAN_STATES, type BrazilianState } from "@/lib/states";
 import { RetroGrid } from "@/components/ui/retro-grid";
+import { Marquee } from "@/components/ui/marquee";
+import { ShinyButton } from "@/components/ui/shiny-button";
+import { cn } from "@/lib/utils";
 
-// Componentes internos simples para evitar crash por falta de arquivo
-const SafeMarquee = ({ children }: { children: React.ReactNode }) => (
-  <div className="flex overflow-hidden py-4 bg-black/20 border-y border-white/5">
-    <div className="flex animate-marquee whitespace-nowrap gap-8 px-4">
-      {children} {children}
-    </div>
-  </div>
-);
+const prizes = [
+  { emoji: "🚗", label: "Toyota Hilux 0km", highlight: true },
+  { emoji: "📱", label: "iPhones 16 Pro" },
+  { emoji: "🏍️", label: "Motos Honda" },
+  { emoji: "🎧", label: "Alexas (Gabarito Supremo)" },
+  { emoji: "🎮", label: "Gift Cards & Vouchers" },
+];
+
+const stats = [
+  { icon: Trophy, value: "104", label: "Jogos" },
+  { icon: Star, value: "82", label: "Pts/Jogo" },
+  { icon: Users, value: "10K+", label: "Jogadores" },
+  { icon: Zap, value: "10x", label: "Multi Final" },
+];
+
+type Step = "info" | "payment" | "success";
 
 const Landing = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState<"info" | "payment">("info");
+  const [searchParams] = useSearchParams();
+  const [step, setStep] = useState<Step>("info");
+
   const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [birthDate, setBirthDate] = useState("");
+  const [password, setPassword] = useState("");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
+
+  const referralCode = searchParams.get("ref") || "";
+  const [selectedPlan, setSelectedPlan] = useState<"avista" | "parcelado">("avista");
+  const [processing, setProcessing] = useState(false);
+
+  const handleNextStep = () => {
+    if (!fullName.trim() || !email.trim() || !whatsapp.trim() || !cpf.trim() || !birthDate || !password || !state || !city.trim()) {
+      toast.error("Preencha todos os campos.");
+      return;
+    }
+    if (!validateCPF(cpf)) {
+      toast.error("CPF inválido.");
+      return;
+    }
+    setStep("payment");
+  };
+
+  const handlePay = async () => {
+    setProcessing(true);
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+      if (authError) throw authError;
+      setStep("success");
+    } catch (err: any) {
+      toast.error(err.message || "Erro ao processar.");
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#051109] text-white pb-20 font-sans">
-      {/* Hero com RetroGrid */}
-      <div className="relative overflow-hidden min-h-[450px] flex flex-col items-center justify-center border-b border-white/5">
-        <RetroGrid className="opacity-30" />
-        <div className="relative z-10 px-4 text-center max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[10px] font-bold mb-6 uppercase tracking-widest">
+    <div className="min-h-screen pb-20 bg-background">
+      {/* Hero Section */}
+      <div className="relative overflow-hidden min-h-[450px] flex flex-col items-center justify-center" style={{ background: "var(--gradient-hero)" }}>
+        <RetroGrid className="opacity-40" />
+        <div className="relative z-10 px-4 pt-12 pb-8 text-center max-w-lg mx-auto">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-4">
             <Zap className="w-3 h-3" /> Copa do Mundo 2026
           </div>
-          <h1 className="text-4xl md:text-7xl font-black leading-none mb-6">
-            CONCORRA A <br />
-            <span className="text-yellow-500">R$ 1 MILHÃO</span>
+          <h1 className="text-4xl md:text-6xl font-black leading-tight text-foreground">
+            CONCORRA A <span className="text-gradient-gold">R$ 1 MILHÃO</span> EM PRÊMIOS
           </h1>
-          <p className="text-gray-400 text-sm md:text-base max-w-sm mx-auto">
-            O site voltou! Agora o seu Super Bolão está pronto para receber os palpites de Londrina e do mundo.
+          <p className="text-muted-foreground text-sm mt-3 max-w-sm mx-auto">
+            Faça seus palpites em 104 jogos da Copa. Acumule pontos e leve prêmios incríveis.
           </p>
         </div>
       </div>
 
-      {/* Marquee Simples */}
-      <SafeMarquee>
-        <span className="text-xl font-black flex items-center gap-2">🚗 TOYOTA HILUX 0KM <span className="text-yellow-500">•</span></span>
-        <span className="text-xl font-black flex items-center gap-2">📱 IPHONES 16 PRO <span className="text-yellow-500">•</span></span>
-        <span className="text-xl font-black flex items-center gap-2">🏍️ MOTOS HONDA <span className="text-yellow-500">•</span></span>
-      </SafeMarquee>
-
-      {/* Form Section */}
-      <div className="px-4 -mt-10 relative z-20 max-w-lg mx-auto">
-        <Card className="bg-[#0a1a0f] border-white/10 shadow-2xl overflow-hidden">
-          <CardContent className="pt-8 space-y-4">
-            <div className="text-center mb-6">
-              <Shield className="w-10 h-10 mx-auto text-yellow-500 mb-3" />
-              <h2 className="text-2xl font-black text-white">Inscreva-se Agora</h2>
-              <p className="text-xs text-gray-500">Garante a tua vaga no maior bolão do Brasil</p>
-            </div>
-
-            <div className="space-y-3">
-              <Input 
-                placeholder="Nome Completo" 
-                className="bg-black/40 border-white/10 h-12 text-white"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-              />
-              <Input placeholder="E-mail" className="bg-black/40 border-white/10 h-12 text-white" />
-              
-              <Button className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-black py-7 rounded-xl text-lg shadow-[0_0_20px_rgba(234,179,8,0.2)]">
-                CONTINUAR <ChevronRight className="w-5 h-5 ml-1" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Stats Simples */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 px-4 mt-12 max-w-lg mx-auto">
-        {[
-          { icon: Trophy, val: "104", label: "Jogos" },
-          { icon: Users, val: "10K+", label: "Jogadores" }
-        ].map((s, i) => (
-          <div key={i} className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
-             <div className="text-2xl font-black text-white">{s.val}</div>
-             <div className="text-[10px] uppercase text-gray-500 font-bold tracking-widest">{s.label}</div>
+      {/* Stats */}
+      <div className="grid grid-cols-4 gap-2 px-4 -mt-10 relative z-20 max-w-lg mx-auto">
+        {stats.map(({ icon: Icon, value, label }) => (
+          <div key={label} className="bg-card border border-border rounded-xl p-3 text-center shadow-xl">
+            <Icon className="w-4 h-4 mx-auto text-primary mb-1" />
+            <div className="text-lg font-black text-foreground">{value}</div>
+            <div className="text-[10px] text-muted-foreground">{label}</div>
           </div>
         ))}
+      </div>
+
+      {/* Marquee de Prêmios */}
+      <div className="mt-12 overflow-hidden">
+        <Marquee pauseOnHover className="[--duration:30s] py-4 bg-black/20 border-y border-border/50">
+          {prizes.map(({ emoji, label, highlight }) => (
+            <div key={label} className={cn("flex items-center gap-4 px-6 py-4 rounded-2xl mx-2 min-w-[260px] border", highlight ? "bg-primary/10 border-primary/30" : "bg-card/50 border-border")}>
+              <span className="text-4xl">{emoji}</span>
+              <span className={cn("font-black text-base", highlight ? "text-primary" : "text-foreground")}>{label}</span>
+            </div>
+          ))}
+        </Marquee>
+      </div>
+
+      {/* Form / Cadastro */}
+      <div className="px-4 mt-12 max-w-lg mx-auto">
+        {step === "info" && (
+          <Card className="border-primary/20 shadow-2xl">
+            <CardContent className="pt-8 space-y-4">
+              <div className="text-center mb-6">
+                <Shield className="w-10 h-10 mx-auto text-primary mb-2" />
+                <h2 className="text-2xl font-black">Inscreva-se Agora</h2>
+              </div>
+              <div className="space-y-3">
+                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nome Completo" />
+                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" />
+                <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" />
+                <Input value={whatsapp} onChange={(e) => setWhatsapp(formatPhone(e.target.value))} placeholder="WhatsApp" />
+                <Input value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))} placeholder="CPF" />
+                <Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
+                <div className="grid grid-cols-2 gap-3">
+                   <select value={state} onChange={(e) => setState(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                      <option value="">UF</option>
+                      {BRAZILIAN_STATES.map((s) => <option key={s.uf} value={s.uf}>{s.uf}</option>)}
+                   </select>
+                   <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Cidade" />
+                </div>
+              </div>
+              <ShinyButton onClick={handleNextStep} className="w-full bg-primary py-6">
+                CONTINUAR <ChevronRight className="w-4 h-4 ml-2" />
+              </ShinyButton>
+            </CardContent>
+          </Card>
+        )}
+        {/* Outros steps (payment/success) continuariam aqui... */}
       </div>
     </div>
   );
