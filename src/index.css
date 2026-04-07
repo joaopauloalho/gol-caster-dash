@@ -154,3 +154,17 @@
 .animate-grid {
   animation: grid 15s linear infinite;
 }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% - 1rem)); }
+}
+
+.animate-marquee {
+  animation: marquee var(--duration, 40s) linear infinite;
+}
+
+/* Opcional: Se quiser a flutuação dos emojis */
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
