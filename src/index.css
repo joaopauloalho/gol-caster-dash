@@ -170,10 +170,10 @@
 }
 
 @keyframes shiny-slide {
-  from { transform: translateX(-500%); }
-  to { transform: translateX(500%); }
+  from { transform: translateX(-600%); }
+  to { transform: translateX(600%); }
 }
 
 .animate-shiny-slide {
-  animation: shiny-slide 3s infinite;
+  animation: shiny-slide 4s infinite;
 }
