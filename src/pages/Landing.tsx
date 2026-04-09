@@ -70,11 +70,6 @@ const Landing = () => {
       const userId = authData.user?.id;
       if (!userId) throw new Error("Usuário não criado.");
 
-      // Garante que a sessão está ativa antes do insert
-      if (authData.session) {
-        await supabase.auth.setSession(authData.session);
-      }
-
       // Resolve referred_by participant id from referral code
       let referredById: string | null = null;
       if (referralCode) {
@@ -86,29 +81,33 @@ const Landing = () => {
         referredById = refParticipant?.id ?? null;
       }
 
-      const { error: participantError } = await supabase.from("participants").insert({
-        user_id: userId,
-        full_name: fullName.trim(),
-        email: email.trim(),
-        whatsapp: whatsapp.trim(),
-        cpf: cpf.replace(/\D/g, ""),
-        birth_date: birthDate,
-        state,
-        city: city.trim(),
-        plan: selectedPlan,
-        referred_by: referredById,
-        payment_confirmed: false,
+      // Usa Edge Function com service role para contornar RLS no signup
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const regRes = await fetch(`${supabaseUrl}/functions/v1/register-participant`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: supabaseKey,
+        },
+        body: JSON.stringify({
+          userId,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          whatsapp: whatsapp.trim(),
+          cpf: cpf.replace(/\D/g, ""),
+          birthDate,
+          state,
+          city: city.trim(),
+          plan: selectedPlan,
+          referredById,
+        }),
       });
-      if (participantError) throw participantError;
+      const regData = await regRes.json();
+      if (!regRes.ok) throw new Error(regData.error || "Erro ao registrar participante.");
 
-      // Busca o referral_code gerado pelo trigger
-      const { data: newParticipant } = await supabase
-        .from("participants")
-        .select("referral_code")
-        .eq("user_id", userId)
-        .maybeSingle();
-      if (newParticipant?.referral_code) {
-        setMyReferralLink(`${window.location.origin}/?ref=${newParticipant.referral_code}`);
+      if (regData.referral_code) {
+        setMyReferralLink(`${window.location.origin}/?ref=${regData.referral_code}`);
       }
 
       setStep("success");
