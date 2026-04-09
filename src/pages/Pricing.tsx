@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Check, Zap, Crown, ArrowLeft } from "lucide-react";
+import { Check, Zap, Crown, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 const plans = [
@@ -43,7 +44,8 @@ const plans = [
 const Pricing = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isActive, simulatePayment } = useSubscription();
+  const { isActive, createMpPreference } = useSubscription();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   const handleSelect = async (plan: typeof plans[0]) => {
     if (!user) {
@@ -56,14 +58,18 @@ const Pricing = () => {
       navigate("/jogos");
       return;
     }
-    // Simulate payment for now
-    const error = await simulatePayment(plan.id, plan.amount);
-    if (error) {
-      toast.error("Erro ao processar pagamento.");
-    } else {
-      toast.success("Pagamento confirmado! Bem-vindo ao Bolão!");
-      navigate("/jogos");
+
+    setLoadingPlan(plan.id);
+    const result = await createMpPreference(plan.id, plan.amount);
+    setLoadingPlan(null);
+
+    if ("error" in result) {
+      toast.error(result.error || "Erro ao iniciar pagamento.");
+      return;
     }
+
+    // Redireciona para o checkout do Mercado Pago
+    window.location.href = result.init_point;
   };
 
   return (
@@ -122,13 +128,23 @@ const Pricing = () => {
                 </ul>
                 <button
                   onClick={() => handleSelect(plan)}
-                  className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${
+                  disabled={!!loadingPlan}
+                  className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
                     plan.highlight
                       ? "btn-gold"
                       : "bg-muted text-foreground hover:bg-muted/80"
-                  }`}
+                  } disabled:opacity-60`}
                 >
-                  {isActive ? "Plano Ativo ✓" : "Simular Pagamento Concluído"}
+                  {loadingPlan === plan.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Aguarde...
+                    </>
+                  ) : isActive ? (
+                    "Plano Ativo ✓"
+                  ) : (
+                    "Pagar com Mercado Pago"
+                  )}
                 </button>
               </CardContent>
             </Card>
@@ -136,7 +152,7 @@ const Pricing = () => {
         </div>
 
         <p className="text-center text-[10px] text-muted-foreground">
-          Integração com Stripe em breve. Botão simula confirmação para testes.
+          Pagamento seguro via Mercado Pago · Pix, cartão e boleto aceitos
         </p>
       </div>
     </div>

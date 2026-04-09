@@ -14,6 +14,7 @@ import Groups from "./pages/Groups";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import Pricing from "./pages/Pricing";
+import PaymentReturn from "./pages/PaymentReturn";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/perfil" element={<Profile />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/planos" element={<Pricing />} />
+            <Route path="/pagamento/retorno" element={<PaymentReturn />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
           <BottomNav />

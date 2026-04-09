@@ -7,6 +7,7 @@ export interface Subscription {
   plan: string;
   payment_status: string;
   amount: number;
+  mp_payment_id?: string;
 }
 
 export const useSubscription = () => {
@@ -35,23 +36,35 @@ export const useSubscription = () => {
 
   const isActive = subscription?.payment_status === "active";
 
-  const simulatePayment = async (plan: string, amount: number) => {
-    if (!user) return;
-    // Upsert subscription
-    const { error } = await supabase.from("subscriptions").upsert(
+  const createMpPreference = async (plan: string, amount: number) => {
+    if (!user) return { error: "Usuário não autenticado" };
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: "Sessão inválida" };
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mp-preference`,
       {
-        user_id: user.id,
-        plan,
-        amount,
-        payment_status: "active",
-      },
-      { onConflict: "user_id" }
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({
+          plan,
+          amount,
+          userId: user.id,
+          userEmail: user.email,
+          userName: user.user_metadata?.full_name || user.email,
+        }),
+      }
     );
-    if (!error) {
-      await fetchSubscription();
-    }
-    return error;
+
+    const data = await response.json();
+    if (!response.ok) return { error: data.error || "Erro ao criar preferência" };
+    return { init_point: data.init_point as string };
   };
 
-  return { subscription, loading, isActive, simulatePayment, refetch: fetchSubscription };
+  return { subscription, loading, isActive, createMpPreference, refetch: fetchSubscription };
 };
