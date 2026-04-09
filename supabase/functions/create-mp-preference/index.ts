@@ -45,6 +45,20 @@ serve(async (req) => {
       statement_descriptor: "SUPER BOLAO COPA",
       payment_methods: {
         installments: isParcelado ? 3 : 1,
+        excluded_payment_types: isParcelado
+          ? [
+              { id: "ticket" },        // sem boleto
+              { id: "bank_transfer" }, // sem Pix
+              { id: "debit_card" },    // sem débito
+              { id: "atm" },
+              { id: "prepaid_card" },
+            ]
+          : [
+              { id: "ticket" },        // sem boleto
+              { id: "debit_card" },    // sem débito
+              { id: "atm" },
+              { id: "prepaid_card" },
+            ],
       },
     };
 

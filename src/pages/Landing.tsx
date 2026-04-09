@@ -70,6 +70,11 @@ const Landing = () => {
       const userId = authData.user?.id;
       if (!userId) throw new Error("Usuário não criado.");
 
+      // Garante que a sessão está ativa antes do insert
+      if (authData.session) {
+        await supabase.auth.setSession(authData.session);
+      }
+
       // Resolve referred_by participant id from referral code
       let referredById: string | null = null;
       if (referralCode) {
