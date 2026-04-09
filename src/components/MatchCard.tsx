@@ -89,6 +89,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
   const { isActive } = useSubscription();
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
+  const [predictionLoaded, setPredictionLoaded] = useState(false);
   const [scoreA, setScoreA] = useState<number | "">("");
   const [scoreB, setScoreB] = useState<number | "">("");
   const [winner, setWinner] = useState<"A" | "X" | "B" | null>(null);
@@ -99,6 +100,35 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
   const [firstGoal, setFirstGoal] = useState<"A" | "N" | "B" | null>(null);
   const [possession, setPossession] = useState<"A" | "B" | null>(null);
   const [saved, setSaved] = useState(false);
+  const [hasSavedPrediction, setHasSavedPrediction] = useState(false);
+
+  const loadExistingPrediction = async () => {
+    if (!user || predictionLoaded) return;
+    setPredictionLoaded(true);
+    const { data } = await supabase
+      .from("predictions")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("match_id", id)
+      .maybeSingle();
+    if (data) {
+      if (data.home_score !== null) setScoreA(data.home_score);
+      if (data.away_score !== null) setScoreB(data.away_score);
+      if (data.winner_pick) setWinner(data.winner_pick as "A" | "X" | "B");
+      if (data.goal_first_half !== null) setGoalFirstHalf(data.goal_first_half);
+      if (data.goal_second_half !== null) setGoalSecondHalf(data.goal_second_half);
+      if (data.has_red_card !== null) setRedCard(data.has_red_card);
+      if (data.has_penalty !== null) setPenalty(data.has_penalty);
+      if (data.first_to_score) setFirstGoal(data.first_to_score as "A" | "N" | "B");
+      if (data.possession_winner) setPossession(data.possession_winner as "A" | "B");
+      setHasSavedPrediction(true);
+    }
+  };
+
+  const handleToggleExpand = () => {
+    if (!expanded) loadExistingPrediction();
+    setExpanded(!expanded);
+  };
 
   const filledCount = [
     scoreA !== "" && scoreB !== "",
@@ -167,7 +197,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
   return (
     <div className={`card-match rounded-xl overflow-hidden transition-all duration-300 ${expanded ? "ring-1 ring-primary/30" : ""}`}>
       <button
-        onClick={() => setExpanded(!expanded)}
+        onClick={handleToggleExpand}
         className="w-full flex items-center justify-between p-4"
       >
         <div className="flex items-center gap-3 flex-1">
@@ -186,6 +216,11 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
           </div>
         </div>
         <div className="flex items-center gap-2 ml-3">
+          {hasSavedPrediction && filledCount === 0 && (
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/20 text-secondary">
+              ✓
+            </span>
+          )}
           {filledCount > 0 && (
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
               filledCount === 8 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
