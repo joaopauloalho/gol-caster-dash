@@ -5,7 +5,68 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { getPhaseMultiplier } from "@/data/matches";
+import { getPhaseMultiplier, parseMatchDateTime } from "@/data/matches";
+
+// ISO 3166-1 alpha-2 codes for flagcdn.com (keyed by translated PT-BR name)
+const FLAG_CODE: Record<string, string> = {
+  "México": "mx", "Estados Unidos": "us", "Canadá": "ca", "Costa Rica": "cr",
+  "Panamá": "pa", "Honduras": "hn", "El Salvador": "sv", "Jamaica": "jm",
+  "Haiti": "ht", "Trinidad e Tobago": "tt",
+  "Brasil": "br", "Argentina": "ar", "Colômbia": "co", "Uruguai": "uy",
+  "Equador": "ec", "Chile": "cl", "Peru": "pe", "Bolívia": "bo",
+  "Paraguai": "py", "Venezuela": "ve",
+  "França": "fr", "Alemanha": "de", "Espanha": "es", "Inglaterra": "gb-eng",
+  "Portugal": "pt", "Holanda": "nl", "Bélgica": "be", "Itália": "it",
+  "Croácia": "hr", "Suíça": "ch", "Dinamarca": "dk", "Suécia": "se",
+  "Noruega": "no", "Polônia": "pl", "República Tcheca": "cz", "Áustria": "at",
+  "Hungria": "hu", "Romênia": "ro", "Sérvia": "rs", "Ucrânia": "ua",
+  "Escócia": "gb-sct", "País de Gales": "gb-wls", "Turquia": "tr",
+  "Grécia": "gr", "Eslováquia": "sk", "Eslovênia": "si", "Albânia": "al",
+  "Geórgia": "ge", "Islândia": "is", "Macedônia do Norte": "mk",
+  "Bósnia e Herzegovina": "ba", "Montenegro": "me", "Bulgária": "bg",
+  "África do Sul": "za", "Marrocos": "ma", "Egito": "eg", "Nigéria": "ng",
+  "Senegal": "sn", "Camarões": "cm", "Gana": "gh", "Costa do Marfim": "ci",
+  "Argélia": "dz", "Tunísia": "tn", "Congo": "cd", "Cabo Verde": "cv",
+  "Guiné": "gn", "Mali": "ml",
+  "Japão": "jp", "Coreia do Sul": "kr", "Austrália": "au",
+  "Arábia Saudita": "sa", "Irã": "ir", "Catar": "qa", "China": "cn",
+  "Iraque": "iq", "Jordânia": "jo", "Emirados Árabes": "ae",
+  "Indonésia": "id", "Uzbequistão": "uz", "Nova Zelândia": "nz",
+  "Curaçao": "cw",
+};
+
+function getFlagUrl(teamName: string): string | null {
+  const code = FLAG_CODE[teamName];
+  if (!code) return null;
+  return `https://flagcdn.com/w80/${code}.png`;
+}
+
+function getLocalTime(date: string | undefined, time: string): string {
+  if (!date) return time;
+  try {
+    const dt = parseMatchDateTime(date, time);
+    return dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return time;
+  }
+}
+
+interface FlagImgProps {
+  teamName: string;
+  className?: string;
+}
+const FlagImg = ({ teamName, className }: FlagImgProps) => {
+  const src = getFlagUrl(teamName);
+  if (!src) return null;
+  return (
+    <img
+      src={src}
+      alt=""
+      className={className}
+      onError={(e) => { e.currentTarget.style.display = "none"; }}
+    />
+  );
+};
 
 interface MatchCardProps {
   id: number;
@@ -21,8 +82,9 @@ interface MatchCardProps {
   stage?: string;
 }
 
-const MatchCard = ({ id, teamA, teamB, flagA, flagB, time, group, city, matchNumber, stage }: MatchCardProps) => {
+const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: MatchCardProps) => {
   const multiplier = getPhaseMultiplier(stage ?? "Group Stage");
+  const localTime = getLocalTime(date, time);
   const { user } = useAuth();
   const { isActive } = useSubscription();
   const navigate = useNavigate();
@@ -62,6 +124,18 @@ const MatchCard = ({ id, teamA, teamB, flagA, flagB, time, group, city, matchNum
       return;
     }
 
+    // Verifica horário do servidor (anti-fraude: ignora relógio local)
+    if (date) {
+      const { data: serverTime, error: timeErr } = await supabase.rpc("get_server_time");
+      if (!timeErr && serverTime) {
+        const gameStart = parseMatchDateTime(date, time);
+        if (new Date(serverTime as string) >= gameStart) {
+          toast.error("Prazo encerrado! Este jogo já começou.");
+          return;
+        }
+      }
+    }
+
     const { error } = await supabase.from("predictions").upsert(
       {
         user_id: user.id,
@@ -98,25 +172,17 @@ const MatchCard = ({ id, teamA, teamB, flagA, flagB, time, group, city, matchNum
       >
         <div className="flex items-center gap-3 flex-1">
           <div className="flex items-center gap-2 flex-1">
-            <img
-              src={`https://flagcdn.com/w80/${flagA.toLowerCase()}.png`}
-              alt={teamA}
-              className="h-6 rounded shadow-sm"
-            />
+            <FlagImg teamName={teamA} className="h-6 rounded shadow-sm" />
             <span className="font-bold text-sm text-foreground">{teamA}</span>
           </div>
           <div className="flex flex-col items-center px-3">
             <span className="text-[10px] text-muted-foreground font-medium uppercase">{group}</span>
             <span className="text-xs font-bold text-primary">VS</span>
-            <span className="text-[10px] text-muted-foreground">{time}</span>
+            <span className="text-[10px] text-muted-foreground">{localTime}</span>
           </div>
           <div className="flex items-center gap-2 flex-1 justify-end">
             <span className="font-bold text-sm text-foreground">{teamB}</span>
-            <img
-              src={`https://flagcdn.com/w80/${flagB.toLowerCase()}.png`}
-              alt={teamB}
-              className="h-6 rounded shadow-sm"
-            />
+            <FlagImg teamName={teamB} className="h-6 rounded shadow-sm" />
           </div>
         </div>
         <div className="flex items-center gap-2 ml-3">
@@ -140,13 +206,13 @@ const MatchCard = ({ id, teamA, teamB, flagA, flagB, time, group, city, matchNum
             </label>
             <div className="flex items-center justify-center gap-3">
               <div className="flex items-center gap-2">
-                <img src={`https://flagcdn.com/w80/${flagA.toLowerCase()}.png`} alt={teamA} className="h-5 rounded shadow-sm" />
+                <FlagImg teamName={teamA} className="h-5 rounded shadow-sm" />
                 <input type="number" min={0} max={20} value={scoreA} onChange={(e) => setScoreA(e.target.value === "" ? "" : parseInt(e.target.value))} className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="0" />
               </div>
               <span className="text-muted-foreground font-bold text-lg">×</span>
               <div className="flex items-center gap-2">
                 <input type="number" min={0} max={20} value={scoreB} onChange={(e) => setScoreB(e.target.value === "" ? "" : parseInt(e.target.value))} className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="0" />
-                <img src={`https://flagcdn.com/w80/${flagB.toLowerCase()}.png`} alt={teamB} className="h-5 rounded shadow-sm" />
+                <FlagImg teamName={teamB} className="h-5 rounded shadow-sm" />
               </div>
             </div>
           </div>

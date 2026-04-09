@@ -27,6 +27,12 @@ export const PHASE_MULTIPLIERS: Record<PhaseKey, number> = {
   Final: 10,
 };
 
+// Converte date (DD/MM/YYYY) + time (HH:mm) em Brasília para um Date UTC
+export function parseMatchDateTime(date: string, time: string): Date {
+  const [dd, mm, yyyy] = date.split("/");
+  return new Date(`${yyyy}-${mm}-${dd}T${time}:00-03:00`);
+}
+
 export function getPhaseMultiplier(stage: string): number {
   const key = stageToPhase(stage);
   return PHASE_MULTIPLIERS[key];
