@@ -29,6 +29,7 @@ serve(async (req) => {
     );
 
     const { error } = await supabase.from("participants").insert({
+      id: userId,
       user_id: userId,
       full_name: fullName,
       email,
