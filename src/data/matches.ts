@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export interface MatchData {
+  id: number;
   matchNumber: number;
   date: string;
   time: string;
@@ -16,6 +17,20 @@ export interface MatchData {
 export type PhaseKey = "Grupos" | "32avos" | "Oitavas" | "Quartas" | "Semis" | "Final";
 
 export const phases: PhaseKey[] = ["Grupos", "32avos", "Oitavas", "Quartas", "Semis", "Final"];
+
+export const PHASE_MULTIPLIERS: Record<PhaseKey, number> = {
+  Grupos: 1,
+  "32avos": 2,
+  Oitavas: 3,
+  Quartas: 5,
+  Semis: 7,
+  Final: 10,
+};
+
+export function getPhaseMultiplier(stage: string): number {
+  const key = stageToPhase(stage);
+  return PHASE_MULTIPLIERS[key];
+}
 
 function stageToPhase(stage: string): PhaseKey {
   if (stage === "Group Stage") return "Grupos";
@@ -64,6 +79,7 @@ export async function fetchMatchesByPhase(phase: PhaseKey): Promise<MatchData[]>
   }
 
   return (data || []).map((row: any) => ({
+    id: row.id,
     matchNumber: row.match_number,
     date: row.date,
     time: row.time,

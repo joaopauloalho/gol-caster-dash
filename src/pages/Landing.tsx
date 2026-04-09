@@ -1,13 +1,12 @@
-import { useState, useEffect } from "react";
-import { Trophy, Zap, ChevronRight, Shield, CreditCard, QrCode, Users, Star, MapPin, Share2, MessageCircle } from "lucide-react";
+import { useState } from "react";
+import { Trophy, Zap, ChevronRight, Shield, Check, Users, Star } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCPF, formatPhone, validateCPF, calculateAge } from "@/lib/cpf";
+import { formatCPF, formatPhone, validateCPF } from "@/lib/cpf";
 import { toast } from "sonner";
-import { BRAZILIAN_STATES, type BrazilianState } from "@/lib/states";
+import { BRAZILIAN_STATES } from "@/lib/states";
 import { RetroGrid } from "@/components/ui/retro-grid";
 import { Marquee } from "@/components/ui/marquee";
 import { ShinyButton } from "@/components/ui/shiny-button";
@@ -65,6 +64,36 @@ const Landing = () => {
     try {
       const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
       if (authError) throw authError;
+
+      const userId = authData.user?.id;
+      if (!userId) throw new Error("Usuário não criado.");
+
+      // Resolve referred_by participant id from referral code
+      let referredById: string | null = null;
+      if (referralCode) {
+        const { data: refParticipant } = await supabase
+          .from("participants")
+          .select("id")
+          .eq("referral_code", referralCode)
+          .maybeSingle();
+        referredById = refParticipant?.id ?? null;
+      }
+
+      const { error: participantError } = await supabase.from("participants").insert({
+        user_id: userId,
+        full_name: fullName.trim(),
+        email: email.trim(),
+        whatsapp: whatsapp.trim(),
+        cpf: cpf.replace(/\D/g, ""),
+        birth_date: birthDate,
+        state,
+        city: city.trim(),
+        plan: selectedPlan,
+        referred_by: referredById,
+        payment_confirmed: false,
+      });
+      if (participantError) throw participantError;
+
       setStep("success");
     } catch (err: any) {
       toast.error(err.message || "Erro ao processar.");
@@ -144,7 +173,64 @@ const Landing = () => {
             </CardContent>
           </Card>
         )}
-        {/* Outros steps (payment/success) continuariam aqui... */}
+        {step === "payment" && (
+          <Card className="border-primary/20 shadow-2xl">
+            <CardContent className="pt-8 space-y-4">
+              <div className="text-center mb-6">
+                <Trophy className="w-10 h-10 mx-auto text-primary mb-2" />
+                <h2 className="text-2xl font-black">Escolha seu Plano</h2>
+                <p className="text-xs text-muted-foreground mt-1">Selecione a forma de pagamento</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {(["avista", "parcelado"] as const).map((plan) => (
+                  <button
+                    key={plan}
+                    onClick={() => setSelectedPlan(plan)}
+                    className={cn(
+                      "rounded-xl border p-4 text-left transition-all",
+                      selectedPlan === plan
+                        ? "border-primary bg-primary/10"
+                        : "border-border bg-card"
+                    )}
+                  >
+                    <div className="font-black text-sm text-foreground">
+                      {plan === "avista" ? "À Vista" : "Parcelado"}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {plan === "avista" ? "R$ 250 único" : "3× R$ 100"}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <ShinyButton onClick={handlePay} disabled={processing} className="w-full bg-primary py-6">
+                {processing ? "Processando..." : "CONFIRMAR INSCRIÇÃO"}
+              </ShinyButton>
+              <button
+                onClick={() => setStep("info")}
+                className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2"
+              >
+                ← Voltar
+              </button>
+            </CardContent>
+          </Card>
+        )}
+
+        {step === "success" && (
+          <Card className="border-primary/20 shadow-2xl">
+            <CardContent className="pt-8 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center mx-auto">
+                <Check className="w-8 h-8 text-primary" />
+              </div>
+              <h2 className="text-2xl font-black">Inscrição Realizada!</h2>
+              <p className="text-sm text-muted-foreground">
+                Verifique seu e-mail para confirmar a conta. Após confirmar, acesse os jogos e faça seus palpites!
+              </p>
+              <ShinyButton onClick={() => navigate("/jogos")} className="w-full bg-primary py-5">
+                VER JOGOS
+              </ShinyButton>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Trophy, Star, Target, Lock, Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
 
 const teams = [
   "🇧🇷 Brasil", "🇦🇷 Argentina", "🇫🇷 França", "🇩🇪 Alemanha", "🇪🇸 Espanha",
@@ -55,6 +58,7 @@ const SelectCard = ({ title, points, icon, options, value, onChange }: SelectCar
 );
 
 const LongTerm = () => {
+  const { user } = useAuth();
   const [champion, setChampion] = useState("");
   const [finalist1, setFinalist1] = useState("");
   const [finalist2, setFinalist2] = useState("");
@@ -67,6 +71,30 @@ const LongTerm = () => {
   const [youngPlayer, setYoungPlayer] = useState("");
   const [brPhase, setBrPhase] = useState("");
   const [locked, setLocked] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("tournament_predictions")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!data) return;
+        if (data.champion) setChampion(data.champion);
+        if (data.finalist_1) setFinalist1(data.finalist_1);
+        if (data.finalist_2) setFinalist2(data.finalist_2);
+        if (data.semi_1) setSemi1(data.semi_1);
+        if (data.semi_2) setSemi2(data.semi_2);
+        if (data.semi_3) setSemi3(data.semi_3);
+        if (data.semi_4) setSemi4(data.semi_4);
+        if (data.top_scorer) setTopScorer(data.top_scorer);
+        if (data.brazil_scorer) setBrScorer(data.brazil_scorer);
+        if (data.young_player) setYoungPlayer(data.young_player);
+        if (data.brazil_phase) setBrPhase(data.brazil_phase);
+        setLocked(data.locked);
+      });
+  }, [user]);
 
   const allFields = [champion, finalist1, finalist2, semi1, semi2, semi3, semi4, topScorer, brScorer, youngPlayer, brPhase];
   const filledCount = allFields.filter(Boolean).length;
@@ -128,7 +156,37 @@ const LongTerm = () => {
 
         {/* Lock Button */}
         <button
-          onClick={() => setLocked(true)}
+          onClick={async () => {
+            if (!user) {
+              toast.error("Faça login para salvar previsões.");
+              return;
+            }
+            const { error } = await supabase.from("tournament_predictions").upsert(
+              {
+                user_id: user.id,
+                champion,
+                finalist_1: finalist1,
+                finalist_2: finalist2,
+                semi_1: semi1,
+                semi_2: semi2,
+                semi_3: semi3,
+                semi_4: semi4,
+                top_scorer: topScorer,
+                brazil_scorer: brScorer,
+                young_player: youngPlayer,
+                brazil_phase: brPhase,
+                locked: true,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "user_id" }
+            );
+            if (error) {
+              toast.error("Erro ao salvar previsões.");
+              return;
+            }
+            setLocked(true);
+            toast.success("Previsões travadas com sucesso!");
+          }}
           disabled={filledCount < 11 || locked}
           className={`w-full py-4 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all mt-4 ${
             locked

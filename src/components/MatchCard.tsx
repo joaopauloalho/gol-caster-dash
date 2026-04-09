@@ -4,8 +4,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { getPhaseMultiplier } from "@/data/matches";
 
 interface MatchCardProps {
+  id: number;
   teamA: string;
   teamB: string;
   flagA: string;
@@ -18,7 +21,8 @@ interface MatchCardProps {
   stage?: string;
 }
 
-const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber }: MatchCardProps) => {
+const MatchCard = ({ id, teamA, teamB, flagA, flagB, time, group, city, matchNumber, stage }: MatchCardProps) => {
+  const multiplier = getPhaseMultiplier(stage ?? "Group Stage");
   const { user } = useAuth();
   const { isActive } = useSubscription();
   const navigate = useNavigate();
@@ -45,7 +49,7 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
     possession !== null,
   ].filter(Boolean).length;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!user) {
       toast.error("Faça login para salvar palpites.");
       navigate("/auth");
@@ -57,6 +61,31 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
       });
       return;
     }
+
+    const { error } = await supabase.from("predictions").upsert(
+      {
+        user_id: user.id,
+        match_id: id,
+        home_score: scoreA === "" ? null : (scoreA as number),
+        away_score: scoreB === "" ? null : (scoreB as number),
+        winner_pick: winner,
+        goal_first_half: goalFirstHalf,
+        goal_second_half: goalSecondHalf,
+        has_red_card: redCard,
+        has_penalty: penalty,
+        first_to_score: firstGoal,
+        possession_winner: possession,
+        points_earned: 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,match_id" }
+    );
+
+    if (error) {
+      toast.error("Erro ao salvar palpite.");
+      return;
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -168,7 +197,8 @@ const MatchCard = ({ teamA, teamB, flagA, flagB, time, group, city, matchNumber 
 
           {filledCount === 8 && (
             <div className="text-center text-[10px] text-primary font-semibold animate-pulse-gold p-2 rounded-lg bg-glass-gold">
-              🏆 Todos os 8 palpites preenchidos — Potencial máximo: 82 pts!
+              🏆 Todos os 8 palpites preenchidos — Potencial máximo: {82 * multiplier} pts
+              {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier})</span>}
             </div>
           )}
         </div>

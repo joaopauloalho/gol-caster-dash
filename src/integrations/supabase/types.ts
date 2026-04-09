@@ -228,6 +228,126 @@ export type Database = {
         }
         Relationships: []
       }
+      // Manually added — not auto-generated
+      predictions: {
+        Row: {
+          id: string
+          user_id: string
+          match_id: number
+          home_score: number | null
+          away_score: number | null
+          winner_pick: string | null
+          goal_first_half: boolean | null
+          goal_second_half: boolean | null
+          has_red_card: boolean | null
+          has_penalty: boolean | null
+          first_to_score: string | null
+          possession_winner: string | null
+          points_earned: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          match_id: number
+          home_score?: number | null
+          away_score?: number | null
+          winner_pick?: string | null
+          goal_first_half?: boolean | null
+          goal_second_half?: boolean | null
+          has_red_card?: boolean | null
+          has_penalty?: boolean | null
+          first_to_score?: string | null
+          possession_winner?: string | null
+          points_earned?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          match_id?: number
+          home_score?: number | null
+          away_score?: number | null
+          winner_pick?: string | null
+          goal_first_half?: boolean | null
+          goal_second_half?: boolean | null
+          has_red_card?: boolean | null
+          has_penalty?: boolean | null
+          first_to_score?: string | null
+          possession_winner?: string | null
+          points_earned?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "predictions_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "matches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tournament_predictions: {
+        Row: {
+          id: string
+          user_id: string
+          champion: string | null
+          finalist_1: string | null
+          finalist_2: string | null
+          semi_1: string | null
+          semi_2: string | null
+          semi_3: string | null
+          semi_4: string | null
+          top_scorer: string | null
+          brazil_scorer: string | null
+          young_player: string | null
+          brazil_phase: string | null
+          locked: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          champion?: string | null
+          finalist_1?: string | null
+          finalist_2?: string | null
+          semi_1?: string | null
+          semi_2?: string | null
+          semi_3?: string | null
+          semi_4?: string | null
+          top_scorer?: string | null
+          brazil_scorer?: string | null
+          young_player?: string | null
+          brazil_phase?: string | null
+          locked?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          champion?: string | null
+          finalist_1?: string | null
+          finalist_2?: string | null
+          semi_1?: string | null
+          semi_2?: string | null
+          semi_3?: string | null
+          semi_4?: string | null
+          top_scorer?: string | null
+          brazil_scorer?: string | null
+          young_player?: string | null
+          brazil_phase?: string | null
+          locked?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
