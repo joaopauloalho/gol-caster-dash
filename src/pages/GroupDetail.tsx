@@ -13,6 +13,7 @@ interface Member {
   city: string;
   bonus_points: number;
   plan: string;
+  favorite_team: string | null;
 }
 
 interface GroupInfo {
@@ -70,9 +71,10 @@ const GroupDetail = () => {
       return;
     }
 
+    // Usa participants_public_view (sem PII: sem CPF, whatsapp, email)
     const { data: parts } = await supabase
-      .from("participants")
-      .select("user_id, full_name, username, state, city, bonus_points, plan")
+      .from("participants_public_view" as any)
+      .select("user_id, full_name, username, state, city, bonus_points, plan, favorite_team")
       .in("user_id", allUserIds);
 
     const sorted = (parts || []).sort((a, b) => (b.bonus_points ?? 0) - (a.bonus_points ?? 0));

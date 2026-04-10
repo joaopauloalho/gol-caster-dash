@@ -1,3 +1,12 @@
+/**
+ * register-participant — cria registro de participante após signup
+ *
+ * Segurança implementada:
+ * 1. Verifica JWT e garante que userId no body = auth.uid()
+ *    (sem isso, qualquer pessoa podia criar participante para outro usuário)
+ * 2. payment_confirmed sempre começa como false (não aceito do cliente)
+ * 3. bonus_points não aceito do cliente (começa em 0 pelo default do banco)
+ */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,47 +21,68 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json();
-    const { userId, fullName, username, email, whatsapp, cpf, birthDate, state, city, plan, referredById, favoriteTeam, groupInviteCode } = body;
-
-    if (!userId) {
-      return new Response(JSON.stringify({ error: "userId obrigatório" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // ── Verificação de identidade ─────────────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Autenticação obrigatória" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Service role ignora RLS
+    // Usa service role para ter acesso a auth.admin e tabelas protegidas
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // ── Fim verificação ───────────────────────────────────────────────────
+
+    const body = await req.json();
+    const {
+      userId, fullName, username, email, whatsapp,
+      cpf, birthDate, state, city, plan,
+      referredById, favoriteTeam, groupInviteCode,
+    } = body;
+
+    // userId no body deve ser o do token — previne criar participante para outro user
+    if (!userId || user.id !== userId) {
+      return new Response(JSON.stringify({ error: "userId não corresponde ao token" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // payment_confirmed e bonus_points NUNCA vêm do cliente
     const { error } = await supabase.from("participants").insert({
-      id: userId,
-      user_id: userId,
-      full_name: fullName,
-      username: username ?? null,
+      id:                userId,
+      user_id:           userId,
+      full_name:         fullName,
+      username:          username ?? null,
       email,
       whatsapp,
       cpf,
-      birth_date: birthDate,
+      birth_date:        birthDate,
       state,
       city,
       plan,
-      referred_by: referredById ?? null,
-      payment_confirmed: false,
-      favorite_team: favoriteTeam ?? null,
+      referred_by:       referredById ?? null,
+      payment_confirmed: false,  // hardcoded — nunca do cliente
+      favorite_team:     favoriteTeam ?? null,
     });
 
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Busca referral_code gerado
+    // Busca referral_code gerado pelo banco
     const { data: participant } = await supabase
       .from("participants")
       .select("referral_code")
@@ -64,14 +94,16 @@ serve(async (req) => {
       const { data: group } = await supabase
         .from("groups")
         .select("id")
-        .eq("invite_code", groupInviteCode)
+        .ilike("invite_code", groupInviteCode)
         .maybeSingle();
 
       if (group?.id) {
-        // upsert para não quebrar se já for membro
         await supabase
           .from("group_members")
-          .upsert({ group_id: group.id, participant_id: userId }, { onConflict: "group_id,participant_id" });
+          .upsert(
+            { group_id: group.id, user_id: userId, participant_id: userId },
+            { onConflict: "group_id,user_id" }
+          );
       }
     }
 
@@ -81,8 +113,7 @@ serve(async (req) => {
     );
   } catch (err) {
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

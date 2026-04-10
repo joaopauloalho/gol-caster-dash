@@ -291,6 +291,33 @@ export type Database = {
           },
         ]
       }
+      webhook_events: {
+        Row: {
+          id: string
+          provider: string
+          event_id: string
+          event_type: string
+          status: string
+          user_id: string | null
+          payload: Json
+          processed_at: string
+        }
+        Insert: {
+          id?: string
+          provider?: string
+          event_id: string
+          event_type?: string
+          status?: string
+          user_id?: string | null
+          payload?: Json
+          processed_at?: string
+        }
+        Update: {
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       tournament_predictions: {
         Row: {
           id: string
@@ -350,7 +377,19 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      participants_public_view: {
+        Row: {
+          user_id: string
+          username: string | null
+          full_name: string
+          state: string
+          city: string
+          bonus_points: number
+          plan: string
+          favorite_team: string | null
+          is_test_user: boolean
+        }
+      }
     }
     Functions: {
       [_ in never]: never
