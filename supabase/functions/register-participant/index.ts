@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { userId, fullName, email, whatsapp, cpf, birthDate, state, city, plan, referredById, favoriteTeam, groupInviteCode } = body;
+    const { userId, fullName, username, email, whatsapp, cpf, birthDate, state, city, plan, referredById, favoriteTeam, groupInviteCode } = body;
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "userId obrigatório" }), {
@@ -32,6 +32,7 @@ serve(async (req) => {
       id: userId,
       user_id: userId,
       full_name: fullName,
+      username: username ?? null,
       email,
       whatsapp,
       cpf,

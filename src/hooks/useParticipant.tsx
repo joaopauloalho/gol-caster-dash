@@ -5,6 +5,7 @@ import { useAuth } from "./useAuth";
 interface Participant {
   id: string;
   full_name: string;
+  username: string | null;
   payment_confirmed: boolean;
   is_test_user: boolean;
   plan: string;
@@ -30,7 +31,7 @@ export const useParticipant = () => {
     const fetch = async () => {
       const { data } = await supabase
         .from("participants")
-        .select("id, full_name, payment_confirmed, is_test_user, plan, state, city, referral_code, bonus_points, favorite_team")
+        .select("id, full_name, username, payment_confirmed, is_test_user, plan, state, city, referral_code, bonus_points, favorite_team")
         .eq("user_id", user.id)
         .maybeSingle();
       setParticipant(data as Participant | null);

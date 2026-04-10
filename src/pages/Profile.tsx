@@ -62,6 +62,9 @@ const Profile = () => {
             <h1 className="text-xl font-black text-foreground">
               {participant?.full_name || user?.email?.split("@")[0] || "Jogador"}
             </h1>
+            {participant?.username && (
+              <p className="text-xs font-bold text-primary">@{participant.username}</p>
+            )}
             <p className="text-xs text-muted-foreground">{user?.email}</p>
             {participant && (
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">

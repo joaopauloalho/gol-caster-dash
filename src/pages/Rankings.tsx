@@ -7,6 +7,7 @@ import { useParticipant } from "@/hooks/useParticipant";
 interface RankingUser {
   id: string;
   full_name: string;
+  username: string | null;
   city: string;
   state: string;
   bonus_points: number;
@@ -34,7 +35,7 @@ const Rankings = () => {
       setLoading(true);
       let query = supabase
         .from("participants")
-        .select("id, full_name, city, state, bonus_points, avatar_url")
+        .select("id, full_name, username, city, state, bonus_points, avatar_url")
         .eq("payment_confirmed", true)
         .order("bonus_points", { ascending: false })
         .limit(50);
@@ -130,7 +131,7 @@ const Rankings = () => {
                         {p.full_name.charAt(0)}
                       </div>
                       <span className="text-xs font-bold text-foreground text-center truncate w-full">
-                        {p.full_name.split(" ")[0]}
+                        {p.username ? `@${p.username}` : p.full_name.split(" ")[0]}
                       </span>
                       <span className="text-xs text-muted-foreground">{p.city}/{p.state}</span>
                       <span className="text-xs font-bold text-primary">{p.bonus_points} pts</span>
@@ -155,7 +156,9 @@ const Rankings = () => {
                   {p.full_name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm text-foreground truncate">{p.full_name}</div>
+                  <div className="font-bold text-sm text-foreground truncate">
+                    {p.username ? `@${p.username}` : p.full_name}
+                  </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <MapPin className="w-2.5 h-2.5" /> {p.city}/{p.state}
                   </div>

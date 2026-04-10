@@ -1,8 +1,8 @@
-import { useState, useRef, KeyboardEvent } from "react";
+import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, ChevronRight, ArrowLeft, Check, Copy, Share2,
-  User, Mail, Lock, Phone, FileText, Calendar, CreditCard, Gift, Heart,
+  User, Mail, Lock, Phone, FileText, Calendar, CreditCard, Gift, Heart, AtSign, Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,7 @@ import { teams } from "@/data/teams";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type WizardStep = "name" | "contact" | "whatsapp" | "document" | "team" | "address" | "plan" | "success";
+type WizardStep = "name" | "username" | "contact" | "whatsapp" | "document" | "address" | "team" | "plan" | "success";
 
 interface AddressData {
   cep: string; logradouro: string; bairro: string;
@@ -29,15 +29,16 @@ interface OnboardingWizardProps {
 
 // ─── Step order (for direction calc) ─────────────────────────────────────────
 
-const STEPS: WizardStep[] = ["name", "contact", "whatsapp", "document", "address", "team", "plan", "success"];
+const STEPS: WizardStep[] = ["name", "username", "contact", "whatsapp", "document", "address", "team", "plan", "success"];
 
 const STEP_LABELS: Record<WizardStep, string> = {
   name: "Seu nome",
+  username: "Username",
   contact: "Acesso",
   whatsapp: "WhatsApp",
   document: "Documento",
-  team: "Seu time",
   address: "Endereço",
+  team: "Seu time",
   plan: "Plano",
   success: "Pronto!",
 };
@@ -117,6 +118,8 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
 
   // Form state
   const [fullName, setFullName] = useState("");
+  const [username, setUsername] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -146,10 +149,32 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
     else onClose();
   };
 
+  // ── Username: validação + check de disponibilidade (debounced) ───────────────
+
+  const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
+
+  useEffect(() => {
+    const raw = username.trim().toLowerCase();
+    if (!raw) { setUsernameStatus("idle"); return; }
+    if (!USERNAME_RE.test(raw)) { setUsernameStatus("invalid"); return; }
+
+    setUsernameStatus("checking");
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("participants")
+        .select("id")
+        .eq("username", raw)
+        .maybeSingle();
+      setUsernameStatus(data ? "taken" : "available");
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [username]);
+
   // ── Validation per step ──────────────────────────────────────────────────────
 
   const canContinue: Record<WizardStep, boolean> = {
     name: fullName.trim().split(" ").length >= 2 && fullName.trim().length >= 5,
+    username: usernameStatus === "available",
     contact: email.includes("@") && email.includes(".") && password.length >= 6,
     whatsapp: whatsapp.replace(/\D/g, "").length >= 10,
     document: validateCPF(cpf) && birthDate.length === 10,
@@ -199,6 +224,7 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
         body: JSON.stringify({
           userId,
           fullName: fullName.trim(),
+          username: username.trim().toLowerCase(),
           email: email.trim(),
           whatsapp: whatsapp.trim(),
           cpf: cpf.replace(/\D/g, ""),
@@ -328,6 +354,58 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
                   onKeyDown={(e) => handleEnter(e as any, "contact")}
                 />
                 <StepNext disabled={!canContinue.name} onClick={() => goTo("contact")} />
+              </StepWrapper>
+            )}
+
+            {/* ── STEP: username ───────────────────────────────────────────── */}
+            {step === "username" && (
+              <StepWrapper
+                headline="Escolha seu username."
+                sub="Será seu identificador público no ranking. Só letras minúsculas, números e _"
+              >
+                <div>
+                  <UInput
+                    label="Username"
+                    icon={<AtSign className="w-4 h-4" />}
+                    placeholder="joao_silva"
+                    value={username}
+                    autoFocus
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    valid={usernameStatus === "available"}
+                    error={usernameStatus === "taken" || usernameStatus === "invalid"}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                    onKeyDown={(e) => { if (e.key === "Enter" && canContinue.username) goTo("contact"); }}
+                  />
+                  <AnimatePresence mode="wait">
+                    {usernameStatus === "checking" && (
+                      <motion.p key="checking" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        className="flex items-center gap-1.5 mt-2 text-xs text-white/40">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Verificando disponibilidade...
+                      </motion.p>
+                    )}
+                    {usernameStatus === "available" && (
+                      <motion.p key="ok" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className="flex items-center gap-1.5 mt-2 text-xs text-emerald-400">
+                        <Check className="w-3 h-3" /> @{username} está disponível!
+                      </motion.p>
+                    )}
+                    {usernameStatus === "taken" && (
+                      <motion.p key="taken" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className="mt-2 text-xs text-red-400">
+                        Este username já está em uso.
+                      </motion.p>
+                    )}
+                    {usernameStatus === "invalid" && username.length > 0 && (
+                      <motion.p key="invalid" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                        className="mt-2 text-xs text-red-400">
+                        Mínimo 3 caracteres. Apenas letras, números e _.
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </div>
+                <StepNext disabled={!canContinue.username} onClick={() => goTo("contact")} />
               </StepWrapper>
             )}
 

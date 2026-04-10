@@ -15,7 +15,7 @@ const Matches = () => {
   const { hasPaid, loading: partLoading } = useParticipant();
   const navigate = useNavigate();
 
-  const showBlur = !user || !hasPaid;
+  const showBlur = false; // desabilitado para testes
 
   useEffect(() => {
     setLoading(true);
