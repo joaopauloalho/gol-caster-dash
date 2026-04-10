@@ -30,14 +30,17 @@ const Groups = () => {
     if (!user) return;
     setLoading(true);
 
-    const { data: memberships } = await supabase
-      .from("group_members")
-      .select("group_id")
-      .eq("user_id", user.id);
+    // Busca grupos onde é membro OU onde é admin (criador)
+    const [{ data: memberships }, { data: adminGroups }] = await Promise.all([
+      supabase.from("group_members").select("group_id").eq("user_id", user.id),
+      supabase.from("groups").select("*").eq("admin_id", user.id),
+    ]);
 
-    const groupIds = memberships?.map((m) => m.group_id) || [];
+    const memberGroupIds = memberships?.map((m) => m.group_id) || [];
+    const adminGroupIds = (adminGroups || []).map((g) => g.id);
+    const allGroupIds = [...new Set([...memberGroupIds, ...adminGroupIds])];
 
-    if (groupIds.length === 0) {
+    if (allGroupIds.length === 0) {
       setMyGroups([]);
       setLoading(false);
       return;
@@ -46,7 +49,7 @@ const Groups = () => {
     const { data: groups } = await supabase
       .from("groups")
       .select("*")
-      .in("id", groupIds);
+      .in("id", allGroupIds);
 
     setMyGroups((groups as Group[]) || []);
     setLoading(false);
@@ -67,9 +70,13 @@ const Groups = () => {
         .single();
       if (error) throw error;
 
-      await supabase
+      const { error: memberErr } = await supabase
         .from("group_members")
         .insert({ group_id: group.id, user_id: user.id });
+
+      if (memberErr) {
+        console.warn("group_members insert:", memberErr.message);
+      }
 
       toast.success("Grupo criado com sucesso!");
       setGroupName("");
