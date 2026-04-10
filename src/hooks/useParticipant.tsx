@@ -11,6 +11,7 @@ interface Participant {
   city: string;
   referral_code: string;
   bonus_points: number;
+  favorite_team: string | null;
 }
 
 export const useParticipant = () => {
@@ -28,7 +29,7 @@ export const useParticipant = () => {
     const fetch = async () => {
       const { data } = await supabase
         .from("participants")
-        .select("id, full_name, payment_confirmed, plan, state, city, referral_code, bonus_points")
+        .select("id, full_name, payment_confirmed, plan, state, city, referral_code, bonus_points, favorite_team")
         .eq("user_id", user.id)
         .maybeSingle();
       setParticipant(data as Participant | null);

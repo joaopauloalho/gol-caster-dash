@@ -5,35 +5,20 @@ import { Mail, Lock, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    if (isLogin) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.success("Login realizado com sucesso!");
-        navigate("/");
-      }
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      toast.error("E-mail ou senha incorretos.");
     } else {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { emailRedirectTo: window.location.origin },
-      });
-      if (error) {
-        toast.error(error.message);
-      } else {
-        toast.success("Cadastro realizado! Verifique seu e-mail para confirmar.");
-      }
+      toast.success("Login realizado com sucesso!");
+      navigate("/jogos");
     }
     setLoading(false);
   };
@@ -47,17 +32,15 @@ const Auth = () => {
         <ArrowLeft className="w-5 h-5" />
       </button>
 
-      <div className="w-full max-w-sm space-y-6">
+      <div className="w-full max-w-sm space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-black text-foreground">
             Super Bolão <span className="text-gradient-gold">Nacional</span>
           </h1>
-          <p className="text-sm text-muted-foreground">
-            {isLogin ? "Entre na sua conta" : "Crie sua conta"}
-          </p>
+          <p className="text-sm text-muted-foreground">Entre na sua conta</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div className="space-y-2">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               E-mail
@@ -98,16 +81,26 @@ const Auth = () => {
             disabled={loading}
             className="w-full btn-gold py-3 rounded-xl font-bold text-sm disabled:opacity-50"
           >
-            {loading ? "Carregando..." : isLogin ? "Entrar" : "Cadastrar"}
+            {loading ? "Entrando..." : "Entrar"}
           </button>
         </form>
 
-        <div className="text-center">
+        <div className="text-center space-y-3">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-background px-3 text-xs text-muted-foreground">ou</span>
+            </div>
+          </div>
+
+          <p className="text-sm text-muted-foreground">Ainda não participa?</p>
           <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-sm text-primary hover:underline"
+            onClick={() => navigate("/")}
+            className="w-full border border-primary/40 text-primary hover:bg-primary/10 transition-colors py-3 rounded-xl font-bold text-sm"
           >
-            {isLogin ? "Não tem conta? Cadastre-se" : "Já tem conta? Faça login"}
+            Fazer minha inscrição
           </button>
         </div>
       </div>
