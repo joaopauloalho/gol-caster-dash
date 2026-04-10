@@ -60,6 +60,12 @@ serve(async (req) => {
       return new Response("Erro ao salvar pagamento", { status: 500 });
     }
 
+    // Atualiza payment_confirmed no participant
+    await supabase
+      .from("participants")
+      .update({ payment_confirmed: true })
+      .eq("user_id", userId);
+
     return new Response("ok", { status: 200 });
   } catch (error) {
     console.error(error);

@@ -25,3 +25,5 @@ dist-ssr
 .env
 .claude/
 supabase/.temp/
+.vercel
+.env*.local

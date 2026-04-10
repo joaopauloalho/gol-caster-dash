@@ -23,14 +23,15 @@ const BottomNav = () => {
             <button
               key={path}
               onClick={() => navigate(path)}
-              className={`flex flex-col items-center gap-0.5 px-1.5 py-1.5 rounded-lg transition-all duration-200 min-w-0 ${
+              aria-current={isActive ? "page" : undefined}
+            className={`flex flex-col items-center gap-0.5 px-1.5 py-2 rounded-lg transition-all duration-200 min-w-0 min-h-[48px] justify-center ${
                 isActive
                   ? "text-primary scale-105"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Icon className="w-5 h-5" strokeWidth={isActive ? 2.5 : 2} />
-              <span className="text-[10px] font-medium">{label}</span>
+              <span className="text-[11px] font-medium">{label}</span>
               {isActive && (
                 <div className="w-1 h-1 rounded-full bg-primary mt-0.5" />
               )}

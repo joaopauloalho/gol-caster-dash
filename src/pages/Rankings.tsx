@@ -77,15 +77,15 @@ const Rankings = () => {
         <div className="px-4 mb-4">
           <div className="bg-glass-gold rounded-xl p-4 flex items-center justify-between">
             <div>
-              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Sua Posição</div>
+              <div className="text-xs text-muted-foreground uppercase font-semibold">Sua Posição</div>
               <div className="text-3xl font-black text-primary">#{myPos || "—"}</div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Seus Pontos</div>
+              <div className="text-xs text-muted-foreground uppercase font-semibold">Seus Pontos</div>
               <div className="text-3xl font-black text-foreground">{participant.bonus_points}</div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-muted-foreground uppercase font-semibold">Até o Líder</div>
+              <div className="text-xs text-muted-foreground uppercase font-semibold">Até o Líder</div>
               <div className="text-xl font-black text-destructive">
                 {myPos > 0 ? `-${leaderPoints - (participant.bonus_points)}` : "—"}
               </div>
@@ -129,11 +129,11 @@ const Rankings = () => {
                       <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-foreground mb-1">
                         {p.full_name.charAt(0)}
                       </div>
-                      <span className="text-[10px] font-bold text-foreground text-center truncate w-full">
+                      <span className="text-xs font-bold text-foreground text-center truncate w-full">
                         {p.full_name.split(" ")[0]}
                       </span>
-                      <span className="text-[10px] text-muted-foreground">{p.city}/{p.state}</span>
-                      <span className="text-[10px] font-bold text-primary">{p.bonus_points} pts</span>
+                      <span className="text-xs text-muted-foreground">{p.city}/{p.state}</span>
+                      <span className="text-xs font-bold text-primary">{p.bonus_points} pts</span>
                       <div className={`w-full ${heights[i]} rounded-t-lg mt-1 flex items-center justify-center ${
                         posNum === 1 ? "bg-primary/20 border border-primary/30" : "bg-muted"
                       }`}>
@@ -156,13 +156,13 @@ const Rankings = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm text-foreground truncate">{p.full_name}</div>
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <MapPin className="w-2.5 h-2.5" /> {p.city}/{p.state}
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="font-black text-sm text-foreground">{p.bonus_points}</div>
-                  <div className="text-[10px] text-muted-foreground">pts</div>
+                  <div className="text-xs text-muted-foreground">pts</div>
                 </div>
               </div>
             ))}

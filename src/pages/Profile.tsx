@@ -17,11 +17,11 @@ const Profile = () => {
           </div>
           <div>
             <h1 className="text-xl font-black text-foreground">
-              {participant?.plan ? participant.plan : "Jogador"}
+              {participant?.full_name || user?.email?.split("@")[0] || "Jogador"}
             </h1>
             <p className="text-xs text-muted-foreground">{user?.email || "jogador@email.com"}</p>
             {participant && (
-              <p className="text-[10px] text-muted-foreground flex items-center gap-1 mt-0.5">
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 <MapPin className="w-2.5 h-2.5" /> {participant.city}/{participant.state}
               </p>
             )}
@@ -39,7 +39,7 @@ const Profile = () => {
             <div key={label} className="bg-glass rounded-xl p-4 text-center">
               <Icon className={`w-5 h-5 mx-auto mb-2 ${color}`} />
               <div className={`text-2xl font-black ${color}`}>{value}</div>
-              <div className="text-[10px] text-muted-foreground">{label}</div>
+              <div className="text-xs text-muted-foreground">{label}</div>
             </div>
           ))}
         </div>

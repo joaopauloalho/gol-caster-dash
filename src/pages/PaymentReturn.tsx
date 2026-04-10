@@ -9,6 +9,7 @@ const PaymentReturn = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [checking, setChecking] = useState(true);
+  const [showFallback, setShowFallback] = useState(false);
 
   const status = searchParams.get("status");
   const paymentId = searchParams.get("payment_id");
@@ -30,10 +31,16 @@ const PaymentReturn = () => {
         .eq("user_id", user.id)
         .maybeSingle();
 
+      if (attempts >= 5) setShowFallback(true);
       if (data?.payment_status === "active" || attempts >= 8) {
         clearInterval(interval);
         setChecking(false);
         if (data?.payment_status === "active") {
+          // Garante payment_confirmed no participant também
+          await supabase
+            .from("participants")
+            .update({ payment_confirmed: true })
+            .eq("user_id", user.id);
           setTimeout(() => navigate("/jogos"), 2000);
         }
       }
@@ -51,6 +58,14 @@ const PaymentReturn = () => {
               <Loader2 className="w-12 h-12 mx-auto text-primary animate-spin" />
               <h1 className="text-xl font-black text-foreground">Confirmando pagamento...</h1>
               <p className="text-sm text-muted-foreground">Aguarde um instante.</p>
+              {showFallback && (
+                <button
+                  onClick={() => navigate("/jogos")}
+                  className="text-xs text-primary underline mt-2"
+                >
+                  Demorou? Clique aqui para acessar os jogos
+                </button>
+              )}
             </>
           ) : (
             <>

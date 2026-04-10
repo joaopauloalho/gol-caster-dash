@@ -7,7 +7,7 @@ const Header = () => {
   const navigate = useNavigate();
 
   return (
-    <header className="sticky top-0 z-50 bg-glass border-b border-border px-4 py-3">
+    <header className="sticky top-0 z-50 bg-glass border-b border-border px-4 py-3 safe-area-top">
       <div className="flex items-center justify-between max-w-lg mx-auto">
         <button onClick={() => navigate("/")} className="font-black text-sm text-foreground">
           ⚽ Super Bolão

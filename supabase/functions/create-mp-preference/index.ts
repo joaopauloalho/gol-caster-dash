@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { plan, amount, userId, userEmail, userName } = await req.json();
+    const { plan, amount, userId, userEmail, userName, userCpf } = await req.json();
 
     const accessToken = Deno.env.get("MP_ACCESS_TOKEN");
     if (!accessToken) throw new Error("MP_ACCESS_TOKEN não configurado");
@@ -34,6 +34,9 @@ serve(async (req) => {
       payer: {
         email: userEmail,
         name: userName || userEmail,
+        identification: userCpf
+          ? { type: "CPF", number: userCpf.replace(/\D/g, "") }
+          : undefined,
       },
       back_urls: {
         success: `${siteUrl}/pagamento/retorno`,
@@ -43,19 +46,21 @@ serve(async (req) => {
       auto_return: "approved",
       external_reference: `${userId}:${plan}`,
       statement_descriptor: "SUPER BOLAO COPA",
+      notification_url: "https://mmeiehwqgyhnsriqazcw.supabase.co/functions/v1/mp-webhook?apikey=sb_publishable_FhdZwPm1cTAf6eJ_U2SxKw_sbE3QKBV",
       payment_methods: {
-        installments: isParcelado ? 3 : 1,
+        // Pix não suporta parcelas, não definir installments:1 para não filtrá-lo
+        ...(isParcelado ? { installments: 3 } : {}),
         excluded_payment_types: isParcelado
           ? [
               { id: "ticket" },        // sem boleto
-              { id: "bank_transfer" }, // sem Pix
-              { id: "debit_card" },    // sem débito
+              { id: "bank_transfer" }, // sem Pix no parcelado
+              { id: "debit_card" },
               { id: "atm" },
               { id: "prepaid_card" },
             ]
           : [
               { id: "ticket" },        // sem boleto
-              { id: "debit_card" },    // sem débito
+              { id: "debit_card" },
               { id: "atm" },
               { id: "prepaid_card" },
             ],

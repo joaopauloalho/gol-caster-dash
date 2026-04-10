@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, Check, Zap } from "lucide-react";
+import { ChevronDown, ChevronUp, Check, Zap, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useNavigate } from "react-router-dom";
@@ -101,10 +101,12 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
   const [possession, setPossession] = useState<"A" | "B" | null>(null);
   const [saved, setSaved] = useState(false);
   const [hasSavedPrediction, setHasSavedPrediction] = useState(false);
+  const [loadingPrediction, setLoadingPrediction] = useState(false);
 
   const loadExistingPrediction = async () => {
     if (!user || predictionLoaded) return;
     setPredictionLoaded(true);
+    setLoadingPrediction(true);
     const { data } = await supabase
       .from("predictions")
       .select("*")
@@ -123,6 +125,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
       if (data.possession_winner) setPossession(data.possession_winner as "A" | "B");
       setHasSavedPrediction(true);
     }
+    setLoadingPrediction(false);
   };
 
   const handleToggleExpand = () => {
@@ -206,9 +209,9 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
             <span className="font-bold text-sm text-foreground">{teamA}</span>
           </div>
           <div className="flex flex-col items-center px-3">
-            <span className="text-[10px] text-muted-foreground font-medium uppercase">{group}</span>
+            <span className="text-xs text-muted-foreground font-medium uppercase">{group}</span>
             <span className="text-xs font-bold text-primary">VS</span>
-            <span className="text-[10px] text-muted-foreground">{localTime}</span>
+            <span className="text-xs text-muted-foreground">{localTime}</span>
           </div>
           <div className="flex items-center gap-2 flex-1 justify-end">
             <span className="font-bold text-sm text-foreground">{teamB}</span>
@@ -217,12 +220,12 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
         </div>
         <div className="flex items-center gap-2 ml-3">
           {hasSavedPrediction && filledCount === 0 && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary/20 text-secondary">
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-secondary/20 text-secondary">
               ✓
             </span>
           )}
           {filledCount > 0 && (
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
               filledCount === 8 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
             }`}>
               {filledCount}/8
@@ -235,8 +238,14 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
       {expanded && (
         <div className="px-4 pb-4 space-y-4 animate-slide-up">
           <div className="h-px bg-border" />
+          {loadingPrediction && (
+            <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground text-xs">
+              <Loader2 className="w-4 h-4 animate-spin" /> Carregando seu palpite...
+            </div>
+          )}
+          <div className={loadingPrediction ? "hidden" : ""}>
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
               Placar Exato <span className="text-primary">(25 pts)</span>
             </label>
             <div className="flex items-center justify-center gap-3">
@@ -253,7 +262,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
           </div>
 
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
               Vencedor / Empate <span className="text-primary">(10 pts)</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -271,7 +280,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
           </div>
 
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
               Quem marca 1º? <span className="text-primary">(8 pts)</span>
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -282,7 +291,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
           </div>
 
           <div>
-            <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
               Mais Posse de Bola <span className="text-primary">(5 pts)</span>
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -292,12 +301,13 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
             </div>
           </div>
 
+          </div>
           <button onClick={handleSave} className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${saved ? "bg-secondary text-secondary-foreground" : "btn-gold"}`}>
             {saved ? (<><Check className="w-4 h-4" /> Palpite Salvo!</>) : (<><Zap className="w-4 h-4" /> Salvar Palpite</>)}
           </button>
 
           {filledCount === 8 && (
-            <div className="text-center text-[10px] text-primary font-semibold animate-pulse-gold p-2 rounded-lg bg-glass-gold">
+            <div className="text-center text-xs text-primary font-semibold animate-pulse-gold p-2 rounded-lg bg-glass-gold">
               🏆 Todos os 8 palpites preenchidos — Potencial máximo: {82 * multiplier} pts
               {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier})</span>}
             </div>
@@ -317,7 +327,7 @@ interface ToggleFieldProps {
 
 const ToggleField = ({ label, points, value, onChange }: ToggleFieldProps) => (
   <div className="bg-muted/50 rounded-lg p-3">
-    <label className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+    <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
       {label} <span className="text-primary">({points} pts)</span>
     </label>
     <div className="flex gap-2">

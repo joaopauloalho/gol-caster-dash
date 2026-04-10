@@ -57,6 +57,7 @@ export const useSubscription = () => {
           userId: user.id,
           userEmail: user.email,
           userName: user.user_metadata?.full_name || user.email,
+          userCpf: user.user_metadata?.cpf || "",
         }),
       }
     );
