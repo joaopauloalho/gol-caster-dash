@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Trophy, Zap, ChevronRight, Shield, Check, Users, Star, Copy, Share2, Gift, Lock, TrendingUp, Crown } from "lucide-react";
+import {
+  Trophy, Zap, ChevronRight, Shield, Check, Users, Copy, Share2, Gift,
+  Lock, Crown, Target, Eye, MapPin, Map, Globe, Swords, Star
+} from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,69 +13,52 @@ import { BRAZILIAN_STATES } from "@/lib/states";
 import { RetroGrid } from "@/components/ui/retro-grid";
 import { Marquee } from "@/components/ui/marquee";
 import { ShinyButton } from "@/components/ui/shiny-button";
-import { WordRotate } from "@/components/ui/word-rotate";
 import { NumberTicker } from "@/components/ui/number-ticker";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 
-// --- Data ---
+// ─── Animation helpers ────────────────────────────────────────────────────────
 
-const winnerMessages = [
-  { name: "Lucas S.", city: "São Paulo/SP", msg: "Acertei o placar exato! 🎉", pts: "+82 pts" },
-  { name: "Mariana C.", city: "Belo Horizonte/MG", msg: "Gabarito supremo no Brasil x México!", pts: "+350 pts" },
-  { name: "Rafael T.", city: "Curitiba/PR", msg: "Subi 12 posições hoje! 🚀", pts: "+210 pts" },
-  { name: "Ana L.", city: "Recife/PE", msg: "Indiquei 3 amigos e ganhei bônus!", pts: "+600 pts" },
-  { name: "Carlos M.", city: "Porto Alegre/RS", msg: "Meu palpite foi certeiro no Egito x Senegal", pts: "+164 pts" },
-  { name: "Juliana R.", city: "Fortaleza/CE", msg: "Estou no top 10 do meu estado! 🏆", pts: "+420 pts" },
-  { name: "Pedro A.", city: "Manaus/AM", msg: "Primeiro gabarito exato! Que jogo foi esse!", pts: "+328 pts" },
-];
+const fadeUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: (i = 0) => ({
+    opacity: 1, y: 0,
+    transition: { delay: i * 0.12, duration: 0.55, ease: "easeOut" },
+  }),
+};
 
-const bentoCards = [
-  {
-    icon: Zap,
-    color: "text-yellow-400",
-    bg: "from-yellow-500/10 to-transparent",
-    border: "border-yellow-500/20",
-    title: "Prêmios Diários",
-    subtitle: "Todo dia tem vencedor",
-    desc: "Melhores palpites de cada rodada ganham pontos extras e prêmios surpresa. Você não precisa esperar a Copa terminar.",
-    badge: "⚡ Ao vivo",
-  },
-  {
-    icon: Trophy,
-    color: "text-primary",
-    bg: "from-primary/10 to-transparent",
-    border: "border-primary/20",
-    title: "Premiação por Jogo",
-    subtitle: "104 jogos = 104 chances",
-    desc: "Cada partida é uma nova oportunidade. Acerte o placar exato e multiplique seus pontos com o bônus de fase.",
-    badge: "🎯 Por jogo",
-  },
-  {
-    icon: Crown,
-    color: "text-orange-400",
-    bg: "from-orange-500/10 to-transparent",
-    border: "border-orange-500/20",
-    title: "Grande Jackpot",
-    subtitle: "Final da Copa — até R$ 5M",
-    desc: "O grande campeão geral leva o prêmio máximo. Quanto mais longe você chegar, maior o prêmio garantido.",
-    badge: "👑 Grand Prize",
-  },
+const FadeUp = ({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) => (
+  <motion.div
+    variants={fadeUp}
+    custom={delay}
+    initial="hidden"
+    whileInView="visible"
+    viewport={{ once: true, margin: "-60px" }}
+    className={className}
+  >
+    {children}
+  </motion.div>
+);
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+const activityFeed = [
+  "🔥 @joao_paulo subiu para 1º no ranking de Londrina!",
+  "💰 Prêmio do jogo Brasil x Croácia liberado: R$ 500 para @caio_nunes",
+  "🎁 @giulia acaba de liberar sua JBL por indicações!",
+  "🎯 @marcos_r acertou o placar exato — Argentina 2x1 Alemanha!",
+  "🏆 @fernanda_s assumiu o top 3 do Paraná!",
+  "💸 Pix de R$ 250 enviado para @thiago_m — campeão da rodada!",
+  "🔥 @luana acaba de indicar o 10º amigo — JBL a caminho!",
+  "📈 @pedro_alves subiu 47 posições no ranking geral hoje!",
+  "🎯 @carol_lima acertou Vencedor + Placar Exato no Portugal x França!",
+  "💰 @rafa ganhou R$ 180 pela rodada — Gabarito Supremo!",
 ];
 
 type Step = "info" | "payment" | "success";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 32 },
-  visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.1, duration: 0.5, ease: "easeOut" },
-  }),
-};
-
-// --- Component ---
+// ─── Component ────────────────────────────────────────────────────────────────
 
 const Landing = () => {
   const navigate = useNavigate();
@@ -142,16 +128,9 @@ const Landing = () => {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: supabaseKey },
         body: JSON.stringify({
-          userId,
-          fullName: fullName.trim(),
-          email: email.trim(),
-          whatsapp: whatsapp.trim(),
-          cpf: cpf.replace(/\D/g, ""),
-          birthDate,
-          state,
-          city: city.trim(),
-          plan: selectedPlan,
-          referredById,
+          userId, fullName: fullName.trim(), email: email.trim(),
+          whatsapp: whatsapp.trim(), cpf: cpf.replace(/\D/g, ""),
+          birthDate, state, city: city.trim(), plan: selectedPlan, referredById,
         }),
       });
       const regData = await regRes.json();
@@ -168,12 +147,8 @@ const Landing = () => {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: supabaseKey },
         body: JSON.stringify({
-          plan: planId,
-          amount: planAmount,
-          userId,
-          userEmail: email.trim(),
-          userName: fullName.trim(),
-          userCpf: cpf.replace(/\D/g, ""),
+          plan: planId, amount: planAmount, userId,
+          userEmail: email.trim(), userName: fullName.trim(), userCpf: cpf.replace(/\D/g, ""),
         }),
       });
       const prefData = await prefRes.json();
@@ -191,433 +166,692 @@ const Landing = () => {
     document.getElementById("cadastro")?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // ─── RENDER ───────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
 
-      {/* ── HERO ─────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden min-h-[90vh] flex flex-col items-center justify-center px-4 py-20" style={{ background: "var(--gradient-hero)" }}>
-        <RetroGrid className="opacity-30" />
+      {/* ════════════════════════════════════════════════════════════════════
+          1. HERO — "O Convite para a Elite"
+      ════════════════════════════════════════════════════════════════════ */}
+      <section
+        className="relative overflow-hidden min-h-screen flex flex-col items-center justify-center px-4 py-24"
+        style={{ background: "var(--gradient-hero)" }}
+      >
+        <RetroGrid className="opacity-25" />
 
-        <div className="relative z-10 max-w-lg mx-auto text-center space-y-6">
+        {/* Glow orb */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-[500px] h-[500px] rounded-full bg-primary/8 blur-[120px]" />
+        </div>
+
+        <div className="relative z-10 max-w-lg mx-auto text-center space-y-7">
+
           {/* Badge */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
+            initial={{ opacity: 0, scale: 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.4 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/15 border border-primary/30 text-primary text-xs font-bold"
+            transition={{ duration: 0.45 }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold"
+            style={{ background: "rgba(234,179,8,0.12)", borderColor: "rgba(234,179,8,0.35)", color: "#FFD700" }}
           >
-            <Zap className="w-3 h-3" /> Copa do Mundo 2026 — Vagas Limitadas
+            <Crown className="w-3.5 h-3.5" /> Copa do Mundo 2026 — Vagas Limitadas
+          </motion.div>
+
+          {/* Prize ticker */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.6 }}
+            className="space-y-1"
+          >
+            <div className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
+              Prêmio Total
+            </div>
+            <div className="flex items-baseline justify-center gap-2">
+              <span className="text-4xl font-black" style={{ color: "#FFD700" }}>R$</span>
+              <NumberTicker
+                value={5000000}
+                className="text-5xl md:text-7xl font-black"
+                style={{ color: "#FFD700" } as any}
+              />
+            </div>
           </motion.div>
 
           {/* Headline */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
+          <motion.h1
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1 }}
+            transition={{ delay: 0.2, duration: 0.6 }}
+            className="text-3xl md:text-5xl font-black leading-[1.08] text-foreground"
           >
-            <h1 className="text-4xl md:text-6xl font-black leading-[1.05] text-foreground">
-              <span className="text-gradient-gold">R$</span>{" "}
-              <NumberTicker value={5000000} className="text-gradient-gold text-4xl md:text-6xl font-black" />{" "}
-              <span className="text-gradient-gold">em Prêmios.</span>
-              <br />
-              <span className="text-foreground">Sua chance é agora.</span>
-            </h1>
-          </motion.div>
+            O Super Bolão vai distribuir{" "}
+            <span style={{ color: "#FFD700" }}>R$ 5 Milhões.</span>
+            <br />Você está pronto para o{" "}
+            <span className="italic" style={{ color: "#FFD700" }}>topo?</span>
+          </motion.h1>
 
-          {/* Word Rotate */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-lg font-bold text-primary h-8 flex items-center justify-center"
-          >
-            <WordRotate
-              words={["Todo jogo tem prêmio.", "Todo dia tem vencedor.", "Centenas de chances de ganhar."]}
-              className="text-primary"
-            />
-          </motion.div>
-
+          {/* Subheadline */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-            className="text-muted-foreground text-sm max-w-xs mx-auto"
+            transition={{ delay: 0.35 }}
+            className="text-muted-foreground text-sm md:text-base max-w-sm mx-auto leading-relaxed"
           >
-            Faça palpites em todos os 104 jogos da Copa do Mundo. Acumule pontos, suba no ranking e concorra a prêmios toda rodada.
+            Centenas de chances de ganhar. Todo jogo vale prêmio, toda rodada vale Pix,{" "}
+            <span className="text-foreground font-semibold">todo dia tem um novo campeão.</span>
           </motion.p>
 
-          {/* CTAs */}
+          {/* CTA */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
             className="flex flex-col gap-3 max-w-xs mx-auto"
           >
             {user ? (
-              <ShinyButton onClick={() => navigate("/jogos")} className="py-5 text-base">
-                VER JOGOS AGORA <ChevronRight className="w-5 h-5" />
+              <ShinyButton onClick={() => navigate("/jogos")} className="py-5 text-base tracking-wide">
+                ACESSAR JOGOS <ChevronRight className="w-5 h-5" />
               </ShinyButton>
             ) : (
-              <ShinyButton onClick={scrollToForm} className="py-5 text-base">
-                QUERO FAZER PARTE E GANHAR <ChevronRight className="w-5 h-5" />
+              <ShinyButton onClick={scrollToForm} className="py-5 text-[15px] tracking-wide">
+                QUERO MEU LUGAR NA ELITE <ChevronRight className="w-5 h-5" />
               </ShinyButton>
             )}
-            <button
-              onClick={scrollToForm}
-              className="text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground transition-colors"
-            >
-              Já tenho conta — fazer login
-            </button>
+            <p className="text-xs text-muted-foreground">
+              Já participante?{" "}
+              <button onClick={() => navigate("/auth")} className="underline underline-offset-2 hover:text-foreground transition-colors">
+                Fazer login
+              </button>
+            </p>
           </motion.div>
 
-          {/* Trust badges */}
+          {/* Trust row */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.7 }}
-            className="flex items-center justify-center gap-6 text-xs text-muted-foreground"
+            className="flex items-center justify-center gap-5 text-xs text-muted-foreground pt-2"
           >
-            <span className="flex items-center gap-1"><Lock className="w-3 h-3" /> Pagamento seguro</span>
-            <span className="flex items-center gap-1"><Shield className="w-3 h-3" /> Dados protegidos</span>
-            <span className="flex items-center gap-1"><Users className="w-3 h-3" /> 10K+ jogadores</span>
+            <span className="flex items-center gap-1.5"><Lock className="w-3 h-3" /> Pagamento seguro</span>
+            <span className="w-px h-3 bg-border" />
+            <span className="flex items-center gap-1.5"><Shield className="w-3 h-3" /> CPF protegido</span>
+            <span className="w-px h-3 bg-border" />
+            <span className="flex items-center gap-1.5"><Users className="w-3 h-3" /> +10K jogadores</span>
           </motion.div>
         </div>
+
+        {/* Scroll cue */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2 }}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-muted-foreground"
+        >
+          <div className="w-px h-8 bg-gradient-to-b from-border to-transparent" />
+          <span className="text-[10px] tracking-widest uppercase">Role para baixo</span>
+        </motion.div>
       </section>
 
-      {/* ── MARQUEE — Vencedores ─────────────────────────────── */}
-      <div className="overflow-hidden bg-black/30 border-y border-border/40 py-1">
-        <Marquee pauseOnHover className="[--duration:40s]">
-          {winnerMessages.map(({ name, city, msg, pts }) => (
+      {/* ════════════════════════════════════════════════════════════════════
+          ACTIVITY MARQUEE — Social Proof Urgência
+      ════════════════════════════════════════════════════════════════════ */}
+      <div className="overflow-hidden border-y border-border/40 bg-black/40 py-1">
+        <Marquee pauseOnHover className="[--duration:45s]" repeat={3}>
+          {activityFeed.map((msg) => (
             <div
-              key={name}
-              className="flex items-center gap-3 bg-card/60 border border-border/60 rounded-xl px-5 py-3 mx-2 min-w-[260px]"
+              key={msg}
+              className="flex items-center gap-2 bg-card/50 border border-border/50 rounded-lg px-4 py-2 mx-2 whitespace-nowrap"
             >
-              <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-sm font-black text-primary flex-shrink-0">
-                {name.charAt(0)}
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-black text-foreground truncate">{name} · {city}</div>
-                <div className="text-xs text-muted-foreground truncate">{msg}</div>
-              </div>
-              <div className="text-xs font-black text-primary flex-shrink-0">{pts}</div>
+              <span className="text-xs text-foreground">{msg}</span>
             </div>
           ))}
         </Marquee>
       </div>
 
-      {/* ── BENTO — Como Funciona ────────────────────────────── */}
-      <section className="px-4 py-16 max-w-lg mx-auto">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="text-center mb-8"
-        >
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-3">
-            <TrendingUp className="w-3 h-3" /> Como ganhar
+      {/* ════════════════════════════════════════════════════════════════════
+          2. O CICLO DA VITÓRIA — Como Funciona
+      ════════════════════════════════════════════════════════════════════ */}
+      <section className="px-4 py-20 max-w-lg mx-auto">
+        <FadeUp className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold mb-4"
+            style={{ background: "rgba(234,179,8,0.1)", borderColor: "rgba(234,179,8,0.25)", color: "#FFD700" }}>
+            <Zap className="w-3 h-3" /> Como funciona
           </div>
-          <h2 className="text-2xl font-black text-foreground">Prêmios em cada etapa</h2>
-          <p className="text-sm text-muted-foreground mt-1">Você não precisa ganhar tudo — cada acerto vale.</p>
-        </motion.div>
+          <h2 className="text-2xl md:text-3xl font-black text-foreground">O Ciclo da Vitória</h2>
+          <p className="text-sm text-muted-foreground mt-2">Três passos simples. Um único destino: o topo.</p>
+        </FadeUp>
 
-        <div className="space-y-3">
-          {bentoCards.map(({ icon: Icon, color, bg, border, title, subtitle, desc, badge }, i) => (
-            <motion.div
-              key={title}
-              custom={i}
-              variants={fadeUp}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              className={cn(
-                "rounded-2xl border p-5 bg-gradient-to-br",
-                bg,
-                border
-              )}
-            >
-              <div className="flex items-start gap-4">
-                <div className={cn("p-2.5 rounded-xl bg-card/60 flex-shrink-0")}>
-                  <Icon className={cn("w-5 h-5", color)} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-black text-foreground text-sm">{title}</span>
-                    <span className="text-xs bg-card/80 border border-border/60 rounded-full px-2 py-0.5 text-muted-foreground">{badge}</span>
+        <div className="relative">
+          {/* Connecting line */}
+          <div className="absolute left-[28px] top-10 bottom-10 w-px bg-gradient-to-b from-primary/60 via-primary/20 to-transparent hidden sm:block" />
+
+          <div className="space-y-4">
+            {[
+              {
+                step: "01",
+                icon: Target,
+                title: "Dê seu Palpite",
+                desc: "Escolha os placares dos 104 jogos da Copa do Mundo. Quanto mais preciso, mais pontos você acumula.",
+                color: "#FFD700",
+                delay: 0,
+              },
+              {
+                step: "02",
+                icon: Star,
+                title: "Acumule Pontos",
+                desc: "Cada acerto te lança para o topo do ranking — local, estadual e nacional. Multiplicadores de fase turbinando.",
+                color: "#FFD700",
+                delay: 1,
+              },
+              {
+                step: "03",
+                icon: Trophy,
+                title: "Suba e Ganhe",
+                desc: "Seja o premiado do jogo, da rodada ou do dia. Pix, prêmios físicos e a grande bolada da final.",
+                color: "#FFD700",
+                delay: 2,
+              },
+            ].map(({ step, icon: Icon, title, desc, color, delay }) => (
+              <FadeUp key={step} delay={delay}>
+                <div className="flex gap-5 items-start p-5 rounded-2xl border border-border/60 bg-card/40 hover:bg-card/60 transition-colors">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border"
+                    style={{ background: `rgba(234,179,8,0.12)`, borderColor: `rgba(234,179,8,0.3)` }}
+                  >
+                    <Icon className="w-5 h-5" style={{ color }} />
+                    <span className="text-[9px] font-black mt-0.5" style={{ color }}>{step}</span>
                   </div>
-                  <div className={cn("text-xs font-bold mb-1.5", color)}>{subtitle}</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                  <div>
+                    <h3 className="font-black text-base text-foreground mb-1">{title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+                  </div>
+                </div>
+              </FadeUp>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          3. AS 3 FORMAS DE DOMINAR — Mecânicas
+      ════════════════════════════════════════════════════════════════════ */}
+      <section className="px-4 pb-20 max-w-lg mx-auto">
+        <FadeUp className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold mb-4"
+            style={{ background: "rgba(234,179,8,0.1)", borderColor: "rgba(234,179,8,0.25)", color: "#FFD700" }}>
+            <Swords className="w-3 h-3" /> Mecânicas de pontuação
+          </div>
+          <h2 className="text-2xl md:text-3xl font-black text-foreground">As 3 Formas de Dominar</h2>
+          <p className="text-sm text-muted-foreground mt-2">Escolha sua estratégia — ou use as três ao mesmo tempo.</p>
+        </FadeUp>
+
+        <div className="space-y-4">
+          {[
+            {
+              emoji: "🎯",
+              title: "Mestres do Placar",
+              tag: "Curto Prazo",
+              tagColor: "text-green-400",
+              tagBg: "bg-green-400/10 border-green-400/20",
+              desc: "Pontue por placar exato e vencedor em cada jogo. 82 pontos por acerto perfeito, multiplicados pela fase. Cada partida é uma chance nova.",
+              highlight: "82 pts por placar exato",
+              border: "border-green-400/20",
+              glow: "from-green-500/5",
+              delay: 0,
+            },
+            {
+              emoji: "🦅",
+              title: "Visão de Águia",
+              tag: "Longo Prazo",
+              tagColor: "text-blue-400",
+              tagBg: "bg-blue-400/10 border-blue-400/20",
+              desc: "Bônus massivos para quem acertar Campeão, Artilheiro e Finalistas antes da Copa começar. Uma aposta. Um jackpot.",
+              highlight: "Bônus de até 10x na final",
+              border: "border-blue-400/20",
+              glow: "from-blue-500/5",
+              delay: 1,
+            },
+            {
+              emoji: "👥",
+              title: "Comandante de Tropa",
+              tag: "Indicação",
+              tagColor: "text-primary",
+              tagBg: "bg-primary/10 border-primary/20",
+              desc: "Ganhe pontos extras por cada amigo que entrar no bolão. Quanto maior a sua tropa, maior o seu impacto no ranking — e no prêmio.",
+              highlight: "+200 pts por indicação confirmada",
+              border: "border-primary/20",
+              glow: "from-primary/5",
+              delay: 2,
+            },
+          ].map(({ emoji, title, tag, tagColor, tagBg, desc, highlight, border, glow, delay }) => (
+            <FadeUp key={title} delay={delay}>
+              <div className={cn("rounded-2xl border p-6 bg-gradient-to-br to-transparent", border, glow)}>
+                <div className="flex items-start gap-4">
+                  <span className="text-3xl flex-shrink-0">{emoji}</span>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <h3 className="font-black text-base text-foreground">{title}</h3>
+                      <span className={cn("text-xs font-bold px-2 py-0.5 rounded-full border", tagColor, tagBg)}>{tag}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-3">{desc}</p>
+                    <div className="inline-flex items-center gap-1.5 bg-card/60 rounded-lg px-3 py-1.5 border border-border/50">
+                      <Zap className="w-3 h-3 text-primary" />
+                      <span className="text-xs font-black text-foreground">{highlight}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </motion.div>
+            </FadeUp>
           ))}
         </div>
       </section>
 
-      {/* ── PRÊMIOS FÍSICOS ──────────────────────────────────── */}
-      <section className="overflow-hidden pb-10">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="text-center px-4 mb-6"
-        >
-          <h2 className="text-2xl font-black text-foreground">Prêmios que você pode levar</h2>
-          <p className="text-sm text-muted-foreground mt-1">Além dos prêmios em dinheiro, concorra a prêmios físicos incríveis</p>
-        </motion.div>
+      {/* ════════════════════════════════════════════════════════════════════
+          4. COMPETIÇÃO LOCAL E GLOBAL — Rankings
+      ════════════════════════════════════════════════════════════════════ */}
+      <section
+        className="px-4 py-20"
+        style={{ background: "linear-gradient(180deg, transparent 0%, rgba(234,179,8,0.04) 50%, transparent 100%)" }}
+      >
+        <div className="max-w-lg mx-auto">
+          <FadeUp className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold mb-4"
+              style={{ background: "rgba(234,179,8,0.1)", borderColor: "rgba(234,179,8,0.25)", color: "#FFD700" }}>
+              <Globe className="w-3 h-3" /> Múltiplas frentes
+            </div>
+            <h2 className="text-2xl md:text-3xl font-black text-foreground">Competição Local e Global</h2>
+            <p className="text-sm text-muted-foreground mt-2">Você compete em três frentes ao mesmo tempo — do bairro ao Brasil.</p>
+          </FadeUp>
 
-        <Marquee pauseOnHover className="[--duration:25s] py-2" repeat={3}>
-          {[
-            { emoji: "🚗", label: "Toyota Hilux 0km", highlight: true },
-            { emoji: "📱", label: "iPhone 16 Pro" },
-            { emoji: "🏍️", label: "Honda CG 160" },
-            { emoji: "🎧", label: "Alexa Echo" },
-            { emoji: "🎮", label: "Gift Cards" },
-            { emoji: "✈️", label: "Pacote de viagem" },
-            { emoji: "💻", label: "MacBook Air" },
-          ].map(({ emoji, label, highlight }) => (
+          <div className="grid grid-cols-1 gap-3">
+            {[
+              {
+                icon: MapPin,
+                emoji: "🏙️",
+                title: "Ranking da sua Cidade",
+                example: "Seja o #1 de Londrina",
+                desc: "Mostre para todo mundo da sua cidade que você entende de futebol mais do que ninguém.",
+                color: "text-emerald-400",
+                border: "border-emerald-400/20",
+                bg: "from-emerald-500/5",
+                delay: 0,
+              },
+              {
+                icon: Map,
+                emoji: "🗺️",
+                title: "Ranking do seu Estado",
+                example: "Domine o Paraná",
+                desc: "Seu estado inteiro vai saber quem é o maior especialista em palpites desta Copa.",
+                color: "text-blue-400",
+                border: "border-blue-400/20",
+                bg: "from-blue-500/5",
+                delay: 1,
+              },
+              {
+                icon: Globe,
+                emoji: "🇧🇷",
+                title: "Ranking Geral",
+                example: "Dispute R$ 5 Milhões",
+                desc: "A arena máxima. Você contra o Brasil inteiro. O topo paga R$ 5 milhões em prêmios.",
+                color: "text-primary",
+                border: "border-primary/25",
+                bg: "from-primary/8",
+                delay: 2,
+              },
+            ].map(({ icon: Icon, emoji, title, example, desc, color, border, bg, delay }) => (
+              <FadeUp key={title} delay={delay}>
+                <div className={cn("flex items-center gap-5 p-5 rounded-2xl border bg-gradient-to-r to-transparent", border, bg)}>
+                  <div className="text-4xl flex-shrink-0">{emoji}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-black text-base text-foreground">{title}</div>
+                    <div className={cn("text-sm font-bold mb-1", color)}>{example}</div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">{desc}</p>
+                  </div>
+                  <Icon className={cn("w-5 h-5 flex-shrink-0 opacity-40", color)} />
+                </div>
+              </FadeUp>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          5. SOCIAL & GRUPOS — "Crie sua própria Arena"
+      ════════════════════════════════════════════════════════════════════ */}
+      <section className="px-4 py-20 max-w-lg mx-auto">
+        <FadeUp>
+          <div className="rounded-3xl border border-border/60 bg-card/30 overflow-hidden">
+            {/* Header bar */}
             <div
-              key={label}
-              className={cn(
-                "flex items-center gap-3 px-5 py-3.5 rounded-2xl mx-1.5 border min-w-[200px]",
-                highlight ? "bg-primary/10 border-primary/30" : "bg-card/50 border-border/50"
-              )}
+              className="px-6 py-4 border-b border-border/40 flex items-center gap-3"
+              style={{ background: "rgba(234,179,8,0.06)" }}
             >
-              <span className="text-3xl">{emoji}</span>
-              <span className={cn("font-black text-sm", highlight ? "text-primary" : "text-foreground")}>{label}</span>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(234,179,8,0.2)" }}>
+                <Users className="w-4 h-4" style={{ color: "#FFD700" }} />
+              </div>
+              <div>
+                <div className="font-black text-sm text-foreground">Social & Grupos</div>
+                <div className="text-xs text-muted-foreground">Crie sua própria Arena</div>
+              </div>
+              <div className="ml-auto flex gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div>
+                <h2 className="text-2xl font-black text-foreground mb-2">
+                  Desafie quem você{" "}
+                  <span style={{ color: "#FFD700" }}>quiser.</span>
+                </h2>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Além do prêmio oficial da plataforma, você pode criar grupos exclusivos
+                  para competir com quem quiser — amigos, família, colegas de trabalho.
+                  Sua competição, suas regras, suas apostas.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { icon: "🏠", title: "Família", desc: "Quem sabe mais de futebol em casa?" },
+                  { icon: "💼", title: "Trabalho", desc: "Mostre que você é o craque do escritório" },
+                  { icon: "🎓", title: "Faculdade", desc: "Turma toda no mesmo bolão" },
+                  { icon: "🔒", title: "Privado", desc: "Grupo fechado, só quem você convidar" },
+                ].map(({ icon, title, desc }) => (
+                  <div key={title} className="bg-muted/30 border border-border/50 rounded-xl p-4">
+                    <div className="text-2xl mb-2">{icon}</div>
+                    <div className="font-black text-sm text-foreground">{title}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{desc}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div
+                className="flex items-center gap-3 rounded-xl border px-4 py-3"
+                style={{ background: "rgba(234,179,8,0.06)", borderColor: "rgba(234,179,8,0.2)" }}
+              >
+                <Eye className="w-4 h-4 flex-shrink-0" style={{ color: "#FFD700" }} />
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Personalize sua competição privada dentro da plataforma. Ranking exclusivo do grupo, histórico de partidas e muito mais.
+                </p>
+              </div>
+            </div>
+          </div>
+        </FadeUp>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          6. BANNER VIRAL — JBL
+      ════════════════════════════════════════════════════════════════════ */}
+      <section className="px-4 pb-20 max-w-lg mx-auto">
+        <FadeUp>
+          <div
+            className="relative overflow-hidden rounded-3xl border p-8 text-center"
+            style={{
+              background: "linear-gradient(135deg, rgba(234,179,8,0.15) 0%, rgba(234,179,8,0.05) 60%, rgba(0,0,0,0.2) 100%)",
+              borderColor: "rgba(234,179,8,0.4)",
+            }}
+          >
+            {/* Background glow */}
+            <div
+              className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full blur-[80px] pointer-events-none"
+              style={{ background: "rgba(234,179,8,0.2)" }}
+            />
+
+            <div className="relative z-10 space-y-4">
+              <div className="text-5xl mb-2">🎧</div>
+
+              <div
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold"
+                style={{ background: "rgba(234,179,8,0.15)", borderColor: "rgba(234,179,8,0.4)", color: "#FFD700" }}
+              >
+                <Gift className="w-3 h-3" /> Recompensa garantida
+              </div>
+
+              <h2
+                className="text-3xl md:text-4xl font-black leading-tight"
+                style={{ color: "#FFD700" }}
+              >
+                TROQUE 10 AMIGOS<br />POR UMA JBL
+              </h2>
+
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
+                Convide 10 amigos para a elite e, assim que eles confirmarem,{" "}
+                <span className="text-foreground font-bold">você ganha um fone JBL na hora.</span>
+                {" "}Sem sorteio. Sem enrolação.
+              </p>
+
+              <div className="flex items-center justify-center gap-6 pt-2">
+                {["✅ Automático", "⚡ Instantâneo", "🎁 Garantido"].map((item) => (
+                  <span key={item} className="text-xs font-bold text-foreground">{item}</span>
+                ))}
+              </div>
+
+              <ShinyButton onClick={scrollToForm} className="max-w-xs mx-auto py-4 mt-2">
+                QUERO MINHA JBL <ChevronRight className="w-4 h-4" />
+              </ShinyButton>
+            </div>
+          </div>
+        </FadeUp>
+      </section>
+
+      {/* ════════════════════════════════════════════════════════════════════
+          SECOND ACTIVITY MARQUEE
+      ════════════════════════════════════════════════════════════════════ */}
+      <div className="overflow-hidden border-y border-border/30 bg-black/30 pb-1 pt-1 mb-0">
+        <Marquee reverse pauseOnHover className="[--duration:50s]" repeat={3}>
+          {[...activityFeed].reverse().map((msg) => (
+            <div
+              key={msg}
+              className="flex items-center gap-2 bg-card/40 border border-border/40 rounded-lg px-4 py-2 mx-2 whitespace-nowrap"
+            >
+              <span className="text-xs text-foreground">{msg}</span>
             </div>
           ))}
         </Marquee>
-      </section>
+      </div>
 
-      {/* ── MGM — Indique e Ganhe ────────────────────────────── */}
-      <section className="px-4 pb-16 max-w-lg mx-auto">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="bg-card border border-primary/20 rounded-2xl p-6 space-y-5"
-        >
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-3">
-              <Gift className="w-3 h-3" /> Programa de Indicação
-            </div>
-            <h2 className="text-xl font-black text-foreground">Indique e Ganhe Pontos</h2>
-            <p className="text-xs text-muted-foreground mt-1">Sem limite — cada amigo vale pontos extras na classificação</p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            {[
-              { icon: "📤", title: "Compartilhe", desc: "+seu link único" },
-              { icon: "✅", title: "Amigo paga", desc: "+200 pts para você" },
-              { icon: "🎯", title: "10 palpites", desc: "+100 pts bônus" },
-            ].map(({ icon, title, desc }) => (
-              <div key={title} className="text-center bg-muted/50 rounded-xl p-3">
-                <div className="text-2xl mb-1">{icon}</div>
-                <div className="text-xs font-black text-foreground">{title}</div>
-                <div className="text-xs text-primary font-bold mt-0.5">{desc}</div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
-            <div>
-              <div className="text-sm font-black text-foreground">Sem limite de indicações</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Quanto mais indica, mais sobe no ranking</div>
-            </div>
-            <div className="text-3xl font-black text-primary">∞</div>
-          </div>
-        </motion.div>
-      </section>
-
-      {/* ── STATS BAR ────────────────────────────────────────── */}
-      <section className="px-4 pb-16 max-w-lg mx-auto">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="grid grid-cols-4 gap-2"
-        >
-          {[
-            { icon: Trophy, value: "104", label: "Jogos" },
-            { icon: Star, value: "82", label: "Pts/Jogo" },
-            { icon: Users, value: "10K+", label: "Jogadores" },
-            { icon: Zap, value: "10x", label: "Multi Final" },
-          ].map(({ icon: Icon, value, label }) => (
-            <div key={label} className="bg-card border border-border rounded-xl p-3 text-center">
-              <Icon className="w-4 h-4 mx-auto text-primary mb-1" />
-              <div className="text-lg font-black text-foreground">{value}</div>
-              <div className="text-xs text-muted-foreground">{label}</div>
-            </div>
-          ))}
-        </motion.div>
-      </section>
-
-      {/* ── CTA ANTES DO FORM ────────────────────────────────── */}
-      <section className="px-4 pb-8 max-w-lg mx-auto text-center">
-        <motion.div
-          variants={fadeUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="space-y-4"
-        >
-          <h2 className="text-2xl font-black text-foreground">
-            Vagas se esgotando.{" "}
-            <span className="text-gradient-gold">Garanta a sua agora.</span>
+      {/* ════════════════════════════════════════════════════════════════════
+          CTA PRE-FORM
+      ════════════════════════════════════════════════════════════════════ */}
+      <section className="px-4 py-16 max-w-lg mx-auto text-center">
+        <FadeUp className="space-y-4">
+          <div className="text-4xl">⚽</div>
+          <h2 className="text-2xl md:text-3xl font-black text-foreground">
+            As vagas estão se esgotando.{" "}
+            <span style={{ color: "#FFD700" }}>A sua ainda está aqui.</span>
           </h2>
-          <p className="text-sm text-muted-foreground">
-            A inscrição dá acesso a todos os 104 jogos, ranking por cidade e estado, prêmios em cada rodada e o grande jackpot da final.
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
+            Enquanto você lê isso, outros jogadores já estão acumulando pontos de bônus.
+            A Copa começa — e o Super Bolão também.
           </p>
           {!user && (
-            <ShinyButton onClick={scrollToForm} className="max-w-xs mx-auto py-5">
-              GARANTIR MINHA VAGA <ChevronRight className="w-5 h-5" />
+            <ShinyButton onClick={scrollToForm} className="max-w-xs mx-auto py-5 text-[15px] tracking-wide mt-2">
+              GARANTIR MINHA VAGA AGORA <ChevronRight className="w-5 h-5" />
             </ShinyButton>
           )}
-        </motion.div>
+        </FadeUp>
       </section>
 
-      {/* ── FORM / CADASTRO ──────────────────────────────────── */}
-      <div id="cadastro" className="px-4 pb-24 max-w-lg mx-auto">
+      {/* ════════════════════════════════════════════════════════════════════
+          FORM / CADASTRO
+      ════════════════════════════════════════════════════════════════════ */}
+      <div id="cadastro" className="px-4 pb-28 max-w-lg mx-auto">
+
         {step === "info" && (
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
+            transition={{ duration: 0.55 }}
           >
-            <Card className="border-primary/20 shadow-2xl">
-              <CardContent className="pt-8 space-y-4">
-                <div className="text-center mb-6">
-                  <Shield className="w-10 h-10 mx-auto text-primary mb-2" />
-                  <h2 className="text-2xl font-black">Inscreva-se Agora</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Preencha seus dados e escolha o plano</p>
-                </div>
-                <div className="space-y-3">
-                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nome Completo" />
-                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" />
-                  <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" />
-                  <Input value={whatsapp} onChange={(e) => setWhatsapp(formatPhone(e.target.value))} placeholder="WhatsApp" />
-                  <Input value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))} placeholder="CPF" />
-                  <Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} />
-                  <div className="grid grid-cols-2 gap-3">
-                    <select value={state} onChange={(e) => setState(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                      <option value="">UF</option>
-                      {BRAZILIAN_STATES.map((s) => <option key={s.uf} value={s.uf}>{s.uf}</option>)}
-                    </select>
-                    <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Cidade" />
+            <div
+              className="rounded-3xl border p-1"
+              style={{ borderColor: "rgba(234,179,8,0.3)", background: "rgba(234,179,8,0.04)" }}
+            >
+              <Card className="border-0 bg-transparent shadow-none">
+                <CardContent className="pt-8 pb-8 space-y-5 px-6">
+                  <div className="text-center space-y-2">
+                    <div className="text-3xl">🏆</div>
+                    <h2 className="text-2xl font-black text-foreground">Entre para a Elite</h2>
+                    <p className="text-xs text-muted-foreground">Preencha seus dados abaixo e garanta sua vaga</p>
                   </div>
-                </div>
-                <ShinyButton onClick={handleNextStep} className="w-full py-5">
-                  CONTINUAR <ChevronRight className="w-4 h-4 ml-2" />
-                </ShinyButton>
-                <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1">
-                  <Lock className="w-3 h-3" /> Seus dados estão seguros e protegidos
-                </p>
-              </CardContent>
-            </Card>
+
+                  <div className="space-y-3">
+                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nome Completo" className="h-11" />
+                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className="h-11" />
+                    <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Senha" className="h-11" />
+                    <Input value={whatsapp} onChange={(e) => setWhatsapp(formatPhone(e.target.value))} placeholder="WhatsApp" className="h-11" />
+                    <Input value={cpf} onChange={(e) => setCpf(formatCPF(e.target.value))} placeholder="CPF" className="h-11" />
+                    <div>
+                      <label className="text-xs text-muted-foreground mb-1 block">Data de nascimento</label>
+                      <Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} className="h-11" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <select
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                      >
+                        <option value="">Estado (UF)</option>
+                        {BRAZILIAN_STATES.map((s) => <option key={s.uf} value={s.uf}>{s.uf} — {s.name}</option>)}
+                      </select>
+                      <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Cidade" className="h-11" />
+                    </div>
+                  </div>
+
+                  <ShinyButton onClick={handleNextStep} className="w-full py-5 text-[15px] tracking-wide">
+                    CONTINUAR <ChevronRight className="w-4 h-4" />
+                  </ShinyButton>
+
+                  <p className="text-xs text-center text-muted-foreground flex items-center justify-center gap-1.5">
+                    <Lock className="w-3 h-3" /> Seus dados estão protegidos e criptografados
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           </motion.div>
         )}
 
         {step === "payment" && (
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-primary/20 shadow-2xl">
-              <CardContent className="pt-8 space-y-4">
-                <div className="text-center mb-6">
-                  <Trophy className="w-10 h-10 mx-auto text-primary mb-2" />
-                  <h2 className="text-2xl font-black">Escolha seu Plano</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Selecione a forma de pagamento</p>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {(["avista", "parcelado"] as const).map((plan) => (
-                    <button
-                      key={plan}
-                      onClick={() => setSelectedPlan(plan)}
-                      className={cn(
-                        "rounded-xl border p-4 text-left transition-all",
-                        selectedPlan === plan ? "border-primary bg-primary/10" : "border-border bg-card"
-                      )}
-                    >
-                      <div className="font-black text-sm text-foreground">
-                        {plan === "avista" ? "À Vista" : "Parcelado"}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {plan === "avista" ? "R$ 250 único" : "3× R$ 100"}
-                      </div>
-                      {plan === "avista" && (
-                        <div className="text-xs text-primary font-bold mt-1">✦ Melhor valor</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <ShinyButton onClick={handlePay} disabled={processing} className="w-full py-5">
-                  {processing ? "Processando..." : "CONFIRMAR INSCRIÇÃO"}
-                </ShinyButton>
-                <button onClick={() => setStep("info")} className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2">
-                  ← Voltar
-                </button>
-              </CardContent>
-            </Card>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+            <div
+              className="rounded-3xl border p-1"
+              style={{ borderColor: "rgba(234,179,8,0.3)", background: "rgba(234,179,8,0.04)" }}
+            >
+              <Card className="border-0 bg-transparent shadow-none">
+                <CardContent className="pt-8 pb-8 space-y-5 px-6">
+                  <div className="text-center space-y-2">
+                    <div className="text-3xl">💳</div>
+                    <h2 className="text-2xl font-black text-foreground">Escolha seu Plano</h2>
+                    <p className="text-xs text-muted-foreground">Acesso completo aos 104 jogos + todos os prêmios</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["avista", "parcelado"] as const).map((plan) => (
+                      <button
+                        key={plan}
+                        onClick={() => setSelectedPlan(plan)}
+                        className={cn(
+                          "rounded-2xl border p-5 text-left transition-all",
+                          selectedPlan === plan
+                            ? "border-primary/50 bg-primary/10"
+                            : "border-border/60 bg-card/40"
+                        )}
+                      >
+                        <div className="font-black text-sm text-foreground mb-1">
+                          {plan === "avista" ? "À Vista" : "Parcelado"}
+                        </div>
+                        <div className="text-lg font-black" style={{ color: "#FFD700" }}>
+                          {plan === "avista" ? "R$ 250" : "3× R$ 100"}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {plan === "avista" ? "Pagamento único" : "3 parcelas mensais"}
+                        </div>
+                        {plan === "avista" && (
+                          <div className="text-xs font-bold mt-2" style={{ color: "#FFD700" }}>★ Melhor valor</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  <ShinyButton onClick={handlePay} disabled={processing} className="w-full py-5 text-[15px] tracking-wide">
+                    {processing ? "Processando..." : "CONFIRMAR E PAGAR"}
+                  </ShinyButton>
+
+                  <button onClick={() => setStep("info")} className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors py-2">
+                    ← Voltar ao cadastro
+                  </button>
+                </CardContent>
+              </Card>
+            </div>
           </motion.div>
         )}
 
         {step === "success" && (
-          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-            <Card className="border-primary/20 shadow-2xl">
-              <CardContent className="pt-8 text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-primary/10 border-2 border-primary flex items-center justify-center mx-auto">
-                  <Check className="w-8 h-8 text-primary" />
-                </div>
-                <h2 className="text-2xl font-black">Inscrição Realizada!</h2>
-                <p className="text-sm text-muted-foreground">
-                  Verifique seu e-mail para confirmar a conta. Após confirmar, acesse os jogos e faça seus palpites!
-                </p>
-
-                {myReferralLink && (
-                  <div className="bg-muted/50 border border-primary/20 rounded-xl p-4 text-left space-y-2">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Gift className="w-4 h-4 text-primary" />
-                      <span className="text-xs font-black text-foreground">Seu link de indicação</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Compartilhe e ganhe +200 pts por cada amigo que pagar!</p>
-                    <div className="flex gap-2">
-                      <div className="flex-1 bg-background rounded-lg px-3 py-2 text-xs text-muted-foreground truncate font-mono border border-border">
-                        {myReferralLink}
-                      </div>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(myReferralLink);
-                          setLinkCopied(true);
-                          setTimeout(() => setLinkCopied(false), 2000);
-                        }}
-                        className="p-2 rounded-lg bg-primary text-primary-foreground"
-                      >
-                        {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (navigator.share) {
-                            navigator.share({ title: "Bolão Copa 2026", text: "Entre no Bolão da Copa e concorra a R$ 5 Milhões! 🏆⚽", url: myReferralLink });
-                          } else {
-                            navigator.clipboard.writeText(myReferralLink);
-                          }
-                        }}
-                        className="p-2 rounded-lg bg-secondary text-secondary-foreground"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-                    </div>
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }}>
+            <div
+              className="rounded-3xl border p-1"
+              style={{ borderColor: "rgba(234,179,8,0.3)", background: "rgba(234,179,8,0.04)" }}
+            >
+              <Card className="border-0 bg-transparent shadow-none">
+                <CardContent className="pt-8 pb-8 text-center space-y-5 px-6">
+                  <div
+                    className="w-20 h-20 rounded-full flex items-center justify-center mx-auto border-2"
+                    style={{ background: "rgba(234,179,8,0.15)", borderColor: "rgba(234,179,8,0.5)" }}
+                  >
+                    <Check className="w-10 h-10" style={{ color: "#FFD700" }} />
                   </div>
-                )}
+                  <h2 className="text-2xl font-black text-foreground">Bem-vindo à Elite!</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Verifique seu e-mail para confirmar a conta. Após confirmar, acesse os jogos e faça seus palpites!
+                  </p>
 
-                <ShinyButton onClick={() => navigate("/jogos")} className="w-full py-5">
-                  VER JOGOS
-                </ShinyButton>
-              </CardContent>
-            </Card>
+                  {myReferralLink && (
+                    <div
+                      className="rounded-2xl border p-4 text-left space-y-3"
+                      style={{ background: "rgba(234,179,8,0.06)", borderColor: "rgba(234,179,8,0.25)" }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Gift className="w-4 h-4" style={{ color: "#FFD700" }} />
+                        <span className="text-xs font-black text-foreground">Seu link de indicação</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Compartilhe e ganhe +200 pts por cada amigo que confirmar!</p>
+                      <div className="flex gap-2">
+                        <div className="flex-1 bg-background rounded-lg px-3 py-2 text-xs text-muted-foreground truncate font-mono border border-border">
+                          {myReferralLink}
+                        </div>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(myReferralLink); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); }}
+                          className="p-2.5 rounded-lg bg-primary text-primary-foreground flex-shrink-0"
+                        >
+                          {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (navigator.share) {
+                              navigator.share({ title: "Super Bolão Copa 2026", text: "Entre no Super Bolão da Copa e concorra a R$ 5 Milhões! 🏆⚽", url: myReferralLink });
+                            } else {
+                              navigator.clipboard.writeText(myReferralLink);
+                            }
+                          }}
+                          className="p-2.5 rounded-lg bg-secondary text-secondary-foreground flex-shrink-0"
+                        >
+                          <Share2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <ShinyButton onClick={() => navigate("/jogos")} className="w-full py-5">
+                    VER JOGOS <ChevronRight className="w-4 h-4" />
+                  </ShinyButton>
+                </CardContent>
+              </Card>
+            </div>
           </motion.div>
         )}
       </div>
