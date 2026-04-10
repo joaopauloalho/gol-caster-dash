@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Check, Trophy, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, Trophy, Loader2, ChevronDown, ChevronUp, Zap } from "lucide-react";
 
 const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "";
 
@@ -11,6 +11,7 @@ interface Participant {
   id: string;
   user_id: string;
   full_name: string;
+  username: string | null;
   email: string;
   cpf: string;
   whatsapp: string;
@@ -18,6 +19,7 @@ interface Participant {
   state: string;
   city: string;
   payment_confirmed: boolean;
+  is_test_user: boolean;
   created_at: string;
   bonus_points: number;
 }
@@ -40,8 +42,9 @@ const Admin = () => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"participants" | "matches">("participants");
+  const [activeTab, setActiveTab] = useState<"participants" | "matches" | "testers">("participants");
   const [confirming, setConfirming] = useState<string | null>(null);
+  const [convertingTester, setConvertingTester] = useState<string | null>(null);
   const [scoringMatch, setScoringMatch] = useState<number | null>(null);
   const [expandedMatch, setExpandedMatch] = useState<number | null>(null);
   const [results, setResults] = useState<Record<number, {
@@ -119,6 +122,34 @@ const Admin = () => {
     setExpandedMatch(null);
   };
 
+  const convertToTester = async (participant: Participant) => {
+    setConvertingTester(participant.id);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast.error("Sessão inválida"); setConvertingTester(null); return; }
+
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/setup-test-user`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ participant_id: participant.id }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok || data.results?.[0]?.ok === false) {
+      toast.error(data.error || data.results?.[0]?.error || "Erro ao converter");
+    } else {
+      const slug = data.results[0].username;
+      toast.success(`✅ ${participant.full_name} → @${slug} / 123456`);
+      setParticipants(prev => prev.map(p => p.id === participant.id ? { ...p, is_test_user: true } : p));
+    }
+    setConvertingTester(null);
+  };
+
   const setResult = (matchId: number, field: string, value: unknown) => {
     setResults(prev => ({
       ...prev,
@@ -135,11 +166,11 @@ const Admin = () => {
       <h1 className="text-2xl font-black mb-1">Painel Admin</h1>
       <p className="text-xs text-muted-foreground mb-4">{paid} pagos / {participants.length} inscritos</p>
 
-      <div className="flex gap-2 mb-4">
-        {(["participants", "matches"] as const).map(t => (
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {(["participants", "matches", "testers"] as const).map(t => (
           <button key={t} onClick={() => setActiveTab(t)}
             className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${activeTab === t ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-            {t === "participants" ? "Inscritos" : "Resultados"}
+            {t === "participants" ? "Inscritos" : t === "matches" ? "Resultados" : "⚡ Testers"}
           </button>
         ))}
       </div>
@@ -168,6 +199,46 @@ const Admin = () => {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {activeTab === "testers" && (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-2.5">
+            <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Converte o login do participante para <strong className="text-foreground">username@bolao.test</strong> com senha <strong className="text-foreground">123456</strong>. Participantes já convertidos aparecem com badge ⚡.
+            </p>
+          </div>
+          <div className="space-y-2">
+            {participants.map(p => (
+              <div key={p.id} className="bg-glass rounded-xl p-3 flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-sm truncate">
+                    {p.full_name}
+                    {p.is_test_user && <span className="ml-1.5 text-[10px] text-primary font-black">⚡ tester</span>}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {p.username ? `@${p.username}` : p.email}
+                  </p>
+                </div>
+                {p.is_test_user ? (
+                  <span className="text-[10px] font-bold text-green-500 shrink-0 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5" /> Ativo
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => convertToTester(p)}
+                    disabled={convertingTester === p.id}
+                    className="shrink-0 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[10px] font-bold disabled:opacity-50 flex items-center gap-1"
+                  >
+                    {convertingTester === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                    {convertingTester === p.id ? "..." : "Ativar"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

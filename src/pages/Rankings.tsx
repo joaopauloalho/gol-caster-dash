@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Trophy, TrendingUp, TrendingDown, Minus, Crown, Medal, Award, MapPin, Users, Share2 } from "lucide-react";
+import { Trophy, Crown, Medal, Award, MapPin, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useParticipant } from "@/hooks/useParticipant";
@@ -21,6 +21,9 @@ const PosIcon = ({ pos }: { pos: number }) => {
   return <span className="text-sm font-black text-muted-foreground w-5 text-center">{pos}</span>;
 };
 
+const displayName = (p: RankingUser) =>
+  p.username ? `@${p.username}` : p.full_name.split(" ")[0];
+
 type FilterTab = "geral" | "estado" | "cidade" | "grupo";
 
 const Rankings = () => {
@@ -33,6 +36,54 @@ const Rankings = () => {
   useEffect(() => {
     const fetchRanking = async () => {
       setLoading(true);
+
+      // For group tab we need a different query path
+      if (tab === "grupo") {
+        if (!participant) { setParticipants([]); setLoading(false); return; }
+
+        // 1. Get all groups the current participant belongs to
+        const { data: memberships } = await supabase
+          .from("group_members")
+          .select("group_id")
+          .eq("participant_id", participant.id);
+
+        if (!memberships || memberships.length === 0) {
+          setParticipants([]);
+          setLoading(false);
+          return;
+        }
+
+        const groupIds = memberships.map((m) => m.group_id);
+
+        // 2. Get all participant_ids from those groups
+        const { data: allMembers } = await supabase
+          .from("group_members")
+          .select("participant_id")
+          .in("group_id", groupIds);
+
+        if (!allMembers || allMembers.length === 0) {
+          setParticipants([]);
+          setLoading(false);
+          return;
+        }
+
+        const participantIds = [...new Set(allMembers.map((m) => m.participant_id))];
+
+        // 3. Fetch those participants ranked by points
+        const { data } = await supabase
+          .from("participants")
+          .select("id, full_name, username, city, state, bonus_points, avatar_url")
+          .eq("payment_confirmed", true)
+          .in("id", participantIds)
+          .order("bonus_points", { ascending: false })
+          .limit(50);
+
+        setParticipants(data || []);
+        setLoading(false);
+        return;
+      }
+
+      // Other tabs
       let query = supabase
         .from("participants")
         .select("id, full_name, username, city, state, bonus_points, avatar_url")
@@ -88,7 +139,7 @@ const Rankings = () => {
             <div className="text-right">
               <div className="text-xs text-muted-foreground uppercase font-semibold">Até o Líder</div>
               <div className="text-xl font-black text-destructive">
-                {myPos > 0 ? `-${leaderPoints - (participant.bonus_points)}` : "—"}
+                {myPos > 0 ? `-${leaderPoints - participant.bonus_points}` : "—"}
               </div>
             </div>
           </div>
@@ -114,7 +165,9 @@ const Rankings = () => {
         <div className="text-center py-12 text-muted-foreground text-sm">Carregando ranking...</div>
       ) : participants.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground text-sm">
-          {tab === "grupo" ? "Entre em um grupo para ver o ranking" : "Nenhum participante encontrado"}
+          {tab === "grupo"
+            ? "Entre em um grupo para ver o ranking dos membros"
+            : "Nenhum participante encontrado"}
         </div>
       ) : (
         <>
@@ -131,7 +184,7 @@ const Rankings = () => {
                         {p.full_name.charAt(0)}
                       </div>
                       <span className="text-xs font-bold text-foreground text-center truncate w-full">
-                        {p.username ? `@${p.username}` : p.full_name.split(" ")[0]}
+                        {displayName(p)}
                       </span>
                       <span className="text-xs text-muted-foreground">{p.city}/{p.state}</span>
                       <span className="text-xs font-bold text-primary">{p.bonus_points} pts</span>
@@ -150,14 +203,22 @@ const Rankings = () => {
           {/* List */}
           <div className="px-4 space-y-2">
             {participants.slice(3).map((p, idx) => (
-              <div key={p.id} className="bg-glass rounded-xl p-3 flex items-center gap-3">
+              <div
+                key={p.id}
+                className={`bg-glass rounded-xl p-3 flex items-center gap-3 ${
+                  p.id === participant?.id ? "ring-1 ring-primary" : ""
+                }`}
+              >
                 <PosIcon pos={idx + 4} />
                 <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-foreground">
                   {p.full_name.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm text-foreground truncate">
-                    {p.username ? `@${p.username}` : p.full_name}
+                    {displayName(p)}
+                    {p.id === participant?.id && (
+                      <span className="ml-1.5 text-[10px] text-primary font-black">você</span>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <MapPin className="w-2.5 h-2.5" /> {p.city}/{p.state}
