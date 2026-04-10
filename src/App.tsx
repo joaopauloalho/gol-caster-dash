@@ -11,6 +11,7 @@ import Matches from "./pages/Matches";
 import LongTerm from "./pages/LongTerm";
 import Rankings from "./pages/Rankings";
 import Groups from "./pages/Groups";
+import GroupDetail from "./pages/GroupDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import Pricing from "./pages/Pricing";
@@ -34,6 +35,7 @@ const App = () => (
             <Route path="/long-term" element={<LongTerm />} />
             <Route path="/rankings" element={<Rankings />} />
             <Route path="/grupos" element={<Groups />} />
+            <Route path="/grupos/:id" element={<GroupDetail />} />
             <Route path="/perfil" element={<Profile />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/planos" element={<Pricing />} />

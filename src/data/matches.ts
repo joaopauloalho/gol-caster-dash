@@ -14,11 +14,12 @@ export interface MatchData {
   flagB: string;
 }
 
-export type PhaseKey = "Grupos" | "32avos" | "Oitavas" | "Quartas" | "Semis" | "Final";
+export type PhaseKey = "Brasileirão" | "Grupos" | "32avos" | "Oitavas" | "Quartas" | "Semis" | "Final";
 
-export const phases: PhaseKey[] = ["Grupos", "32avos", "Oitavas", "Quartas", "Semis", "Final"];
+export const phases: PhaseKey[] = ["Brasileirão", "Grupos", "32avos", "Oitavas", "Quartas", "Semis", "Final"];
 
 export const PHASE_MULTIPLIERS: Record<PhaseKey, number> = {
+  Brasileirão: 1,
   Grupos: 1,
   "32avos": 2,
   Oitavas: 3,
@@ -39,6 +40,7 @@ export function getPhaseMultiplier(stage: string): number {
 }
 
 function stageToPhase(stage: string): PhaseKey {
+  if (stage === "Brasileirão") return "Brasileirão";
   if (stage === "Group Stage") return "Grupos";
   if (stage === "Round of 32") return "32avos";
   if (stage === "Round of 16") return "Oitavas";
@@ -64,6 +66,7 @@ export function groupByDate(matches: MatchData[]): MatchDay[] {
 export async function fetchMatchesByPhase(phase: PhaseKey): Promise<MatchData[]> {
   // Map phase back to stage values
   const stageMap: Record<PhaseKey, string[]> = {
+    "Brasileirão": ["Brasileirão"],
     "Grupos": ["Group Stage"],
     "32avos": ["Round of 32"],
     "Oitavas": ["Round of 16"],

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, Lock, ArrowLeft, AtSign, Zap } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,15 +13,42 @@ const Auth = () => {
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteCode = searchParams.get("invite") || "";
+
+  // ── Entra no grupo pelo invite_code (se vier na URL) ─────────────────────────
+  const joinGroupIfInvited = async (userId: string) => {
+    if (!inviteCode) return;
+    // Códigos são gerados em minúsculo no banco (UUID-based)
+    const { data: group } = await supabase
+      .from("groups")
+      .select("id, name")
+      .ilike("invite_code", inviteCode)   // case-insensitive
+      .maybeSingle();
+    if (!group) {
+      toast.error("Código de convite inválido ou expirado.");
+      return;
+    }
+    const { error } = await supabase
+      .from("group_members")
+      .insert({ group_id: group.id, user_id: userId, participant_id: userId });
+    if (error && error.code !== "23505") {
+      // 23505 = já é membro, ignora
+      console.error("joinGroup error:", error.message);
+      return;
+    }
+    toast.success(`Você entrou no grupo "${group.name}"! 🎉`);
+  };
 
   // ── Login normal ──────────────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       toast.error("E-mail ou senha incorretos.");
     } else {
+      await joinGroupIfInvited(data.user.id);
       toast.success("Login realizado!");
       navigate("/jogos");
     }
@@ -60,6 +87,8 @@ const Auth = () => {
     });
 
     if (!loginErr) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (u) await joinGroupIfInvited(u.id);
       toast.success(`Bem-vindo, @${slug}!`);
       navigate("/jogos");
       setLoading(false);
@@ -96,6 +125,8 @@ const Auth = () => {
       if (loginErr2) {
         toast.error("Usuário criado, mas erro no login. Tente novamente.", { id: "tester-create" });
       } else {
+        const { data: { user: u } } = await supabase.auth.getUser();
+        if (u) await joinGroupIfInvited(u.id);
         toast.success(`Bem-vindo, @${slug}! Acesso criado.`, { id: "tester-create" });
         navigate("/jogos");
       }
@@ -135,7 +166,7 @@ const Auth = () => {
                   : "bg-muted text-muted-foreground hover:text-foreground"
               }`}
             >
-              {t === "normal" ? "Login Normal" : "⚡ Acesso Tester"}
+              {t === "normal" ? "Login" : "⚡ Acesso Rápido"}
             </button>
           ))}
         </div>
@@ -197,13 +228,16 @@ const Auth = () => {
           </form>
         )}
 
-        {/* ── TESTER LOGIN ── */}
+        {/* ── ACESSO RÁPIDO ── */}
         {tab === "tester" && (
           <form onSubmit={handleTesterLogin} className="space-y-5">
             <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-2.5">
               <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Acesso rápido para testadores. Digite seu <strong className="text-foreground">username</strong> — sem e-mail, sem senha longa.
+                Digite seu <strong className="text-foreground">username</strong> e entre direto — criamos sua conta automaticamente se ainda não existir.
+                {inviteCode && (
+                  <> Você vai entrar na liga <strong className="text-primary">#{inviteCode.toUpperCase()}</strong> automaticamente.</>
+                )}
               </p>
             </div>
 
@@ -231,7 +265,7 @@ const Auth = () => {
               disabled={loading || !username.trim()}
               className="w-full btn-gold py-3 rounded-xl font-bold text-sm disabled:opacity-50"
             >
-              {loading ? "Entrando..." : "Entrar como Tester"}
+              {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
         )}

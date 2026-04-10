@@ -45,6 +45,9 @@ serve(async (req) => {
 
       const userId = authData.user.id;
 
+      // CPF único: 11 primeiros dígitos do UUID
+      const fakeCpf = userId.replace(/-/g, "").replace(/[^0-9]/g, "").padEnd(11, "0").slice(0, 11);
+
       // Create participant row
       const { error: pErr } = await supabase.from("participants").insert({
         id: userId,
@@ -53,7 +56,7 @@ serve(async (req) => {
         username: slug,
         email: testEmail,
         whatsapp: "00000000000",
-        cpf: "00000000000",
+        cpf: fakeCpf,
         birth_date: "2000-01-01",
         state: "SP",
         city: "Teste",

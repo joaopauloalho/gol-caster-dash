@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { Users, Plus, Copy, LogIn, Check } from "lucide-react";
+import { Users, Plus, Copy, LogIn, Check, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ interface Group {
 
 const Groups = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -72,7 +74,7 @@ const Groups = () => {
 
       const { error: memberErr } = await supabase
         .from("group_members")
-        .insert({ group_id: group.id, user_id: user.id });
+        .insert({ group_id: group.id, user_id: user.id, participant_id: user.id });
 
       if (memberErr) {
         console.warn("group_members insert:", memberErr.message);
@@ -96,7 +98,7 @@ const Groups = () => {
       const { data: group, error: groupError } = await supabase
         .from("groups")
         .select("id")
-        .eq("invite_code", joinCode.trim().toLowerCase())
+        .ilike("invite_code", joinCode.trim())
         .maybeSingle();
 
       if (!group) {
@@ -106,7 +108,7 @@ const Groups = () => {
 
       const { error } = await supabase
         .from("group_members")
-        .insert({ group_id: group.id, user_id: user.id });
+        .insert({ group_id: group.id, user_id: user.id, participant_id: user.id });
 
       if (error?.code === "23505") {
         toast.info("Você já está neste grupo.");
@@ -209,8 +211,12 @@ const Groups = () => {
         ) : (
           <div className="space-y-2">
             {myGroups.map((g) => (
-              <div key={g.id} className="bg-glass rounded-xl p-4 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <div
+                key={g.id}
+                className="bg-glass rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:bg-glass/80 transition-colors"
+                onClick={() => navigate(`/grupos/${g.id}`)}
+              >
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                   <Users className="w-5 h-5 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -220,11 +226,12 @@ const Groups = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => copyCode(g.invite_code, g.id)}
-                  className="text-muted-foreground hover:text-foreground transition-colors p-2"
+                  onClick={(e) => { e.stopPropagation(); copyCode(g.invite_code, g.id); }}
+                  className="text-muted-foreground hover:text-foreground transition-colors p-2 shrink-0"
                 >
                   {copiedId === g.id ? <Check className="w-4 h-4 text-secondary" /> : <Copy className="w-4 h-4" />}
                 </button>
+                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
               </div>
             ))}
           </div>
