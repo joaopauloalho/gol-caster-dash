@@ -477,7 +477,7 @@ export default function OnboardingWizard({ onClose, referralCode = "" }: Onboard
                     initial={address ?? undefined}
                     onNext={(data) => {
                       setAddress(data);
-                      goTo("plan");
+                      goTo("team");
                     }}
                     onBack={goBack}
                   />
