@@ -6,6 +6,7 @@ interface Participant {
   id: string;
   full_name: string;
   payment_confirmed: boolean;
+  is_test_user: boolean;
   plan: string;
   state: string;
   city: string;
@@ -29,7 +30,7 @@ export const useParticipant = () => {
     const fetch = async () => {
       const { data } = await supabase
         .from("participants")
-        .select("id, full_name, payment_confirmed, plan, state, city, referral_code, bonus_points, favorite_team")
+        .select("id, full_name, payment_confirmed, is_test_user, plan, state, city, referral_code, bonus_points, favorite_team")
         .eq("user_id", user.id)
         .maybeSingle();
       setParticipant(data as Participant | null);
@@ -38,5 +39,6 @@ export const useParticipant = () => {
     fetch();
   }, [user]);
 
-  return { participant, loading, hasPaid: participant?.payment_confirmed ?? false };
+  const hasPaid = (participant?.payment_confirmed || participant?.is_test_user) ?? false;
+  return { participant, loading, hasPaid };
 };
