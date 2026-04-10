@@ -45,6 +45,8 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState<"participants" | "matches" | "testers">("participants");
   const [confirming, setConfirming] = useState<string | null>(null);
   const [convertingTester, setConvertingTester] = useState<string | null>(null);
+  const [newTesterUsername, setNewTesterUsername] = useState("");
+  const [creatingTester, setCreatingTester] = useState(false);
   const [scoringMatch, setScoringMatch] = useState<number | null>(null);
   const [expandedMatch, setExpandedMatch] = useState<number | null>(null);
   const [results, setResults] = useState<Record<number, {
@@ -150,6 +152,36 @@ const Admin = () => {
     setConvertingTester(null);
   };
 
+  const createTester = async () => {
+    const slug = newTesterUsername.trim().toLowerCase().replace(/[^a-z0-9_]/g, "");
+    if (!slug || slug.length < 2) { toast.error("Username inválido (mín. 2 caracteres)"); return; }
+    setCreatingTester(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { toast.error("Sessão inválida"); setCreatingTester(false); return; }
+
+    const res = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/setup-test-user`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ create_username: slug }),
+      }
+    );
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      toast.error(data.error || "Erro ao criar tester");
+    } else {
+      toast.success(`✅ @${slug} criado! Login: ${slug} / 123456`);
+      setNewTesterUsername("");
+      fetchAll();
+    }
+    setCreatingTester(false);
+  };
+
   const setResult = (matchId: number, field: string, value: unknown) => {
     setResults(prev => ({
       ...prev,
@@ -207,8 +239,30 @@ const Admin = () => {
           <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-2.5">
             <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Converte o login do participante para <strong className="text-foreground">username@bolao.test</strong> com senha <strong className="text-foreground">123456</strong>. Participantes já convertidos aparecem com badge ⚡.
+              Crie testers do zero ou ative participantes existentes. Login: <strong className="text-foreground">username</strong> / <strong className="text-foreground">123456</strong>
             </p>
+          </div>
+
+          {/* Criar tester do zero */}
+          <div className="bg-glass rounded-xl p-3 space-y-2">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Criar Novo Tester</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newTesterUsername}
+                onChange={(e) => setNewTesterUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ""))}
+                placeholder="username (ex: joaopaulo)"
+                className="flex-1 px-3 py-2 rounded-lg bg-muted text-foreground border border-border text-xs outline-none focus:border-primary"
+              />
+              <button
+                onClick={createTester}
+                disabled={creatingTester || newTesterUsername.trim().length < 2}
+                className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {creatingTester ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />}
+                {creatingTester ? "..." : "Criar"}
+              </button>
+            </div>
           </div>
           <div className="space-y-2">
             {participants.map(p => (

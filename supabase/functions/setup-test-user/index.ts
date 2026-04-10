@@ -18,7 +18,65 @@ serve(async (req) => {
     );
 
     const body = await req.json();
-    // Accept a single participant_id or a list
+
+    // ── MODE 1: create fresh tester from just a username ──────────────────────
+    if (body.create_username) {
+      const slug = String(body.create_username).toLowerCase().replace(/[^a-z0-9_]/g, "");
+      if (!slug || slug.length < 2) {
+        return new Response(JSON.stringify({ error: "Username inválido" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const testEmail = `${slug}@bolao.test`;
+
+      // Create auth user
+      const { data: authData, error: authErr } = await supabase.auth.admin.createUser({
+        email: testEmail,
+        password: "123456",
+        email_confirm: true,
+      });
+
+      if (authErr) {
+        return new Response(JSON.stringify({ error: authErr.message }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const userId = authData.user.id;
+
+      // Create participant row
+      const { error: pErr } = await supabase.from("participants").insert({
+        id: userId,
+        user_id: userId,
+        full_name: slug,
+        username: slug,
+        email: testEmail,
+        whatsapp: "00000000000",
+        cpf: "00000000000",
+        birth_date: "2000-01-01",
+        state: "SP",
+        city: "Teste",
+        plan: "basico",
+        payment_confirmed: false,
+        is_test_user: true,
+      });
+
+      if (pErr) {
+        // Rollback auth user
+        await supabase.auth.admin.deleteUser(userId);
+        return new Response(JSON.stringify({ error: pErr.message }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({ ok: true, username: slug, email: testEmail }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── MODE 2: convert existing participant(s) to tester ─────────────────────
     const ids: string[] = Array.isArray(body.participant_ids)
       ? body.participant_ids
       : body.participant_id
@@ -26,32 +84,28 @@ serve(async (req) => {
       : [];
 
     if (ids.length === 0) {
-      return new Response(JSON.stringify({ error: "participant_id(s) obrigatório" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      return new Response(JSON.stringify({ error: "participant_id(s) ou create_username obrigatório" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const results: { id: string; username: string | null; ok: boolean; error?: string }[] = [];
 
     for (const participantId of ids) {
-      // Fetch participant
-      const { data: p, error: pErr } = await supabase
+      const { data: p } = await supabase
         .from("participants")
         .select("id, user_id, username, full_name, is_test_user")
         .eq("id", participantId)
         .maybeSingle();
 
-      if (pErr || !p) {
+      if (!p) {
         results.push({ id: participantId, username: null, ok: false, error: "Participante não encontrado" });
         continue;
       }
 
-      // Derive test email from username (fallback: first name)
       const slug = (p.username || p.full_name.split(" ")[0]).toLowerCase().replace(/[^a-z0-9_]/g, "");
       const testEmail = `${slug}@bolao.test`;
 
-      // Update auth user: set email + password + confirm email
       const { error: authErr } = await supabase.auth.admin.updateUserById(p.user_id, {
         email: testEmail,
         password: "123456",
@@ -63,7 +117,6 @@ serve(async (req) => {
         continue;
       }
 
-      // Mark as test user
       const { error: updateErr } = await supabase
         .from("participants")
         .update({ is_test_user: true, username: p.username ?? slug })
