@@ -54,6 +54,10 @@ const Landing = () => {
   const [searchParams] = useSearchParams();
   const referralCode = searchParams.get("ref") || "";
 
+  // Captura ?group= e persiste no localStorage para sobreviver ao redirect do MP
+  const groupCode = searchParams.get("group") || "";
+  if (groupCode) localStorage.setItem("pending_group_code", groupCode);
+
   const [showWizard, setShowWizard] = useState(false);
 
   const openWizard = () => {
@@ -69,6 +73,7 @@ const Landing = () => {
         {showWizard && (
           <OnboardingWizard
             referralCode={referralCode}
+            groupInviteCode={groupCode || localStorage.getItem("pending_group_code") || ""}
             onClose={() => setShowWizard(false)}
           />
         )}

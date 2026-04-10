@@ -24,6 +24,7 @@ interface AddressData {
 interface OnboardingWizardProps {
   onClose: () => void;
   referralCode?: string;
+  groupInviteCode?: string;
 }
 
 // ─── Step order (for direction calc) ─────────────────────────────────────────
@@ -111,7 +112,7 @@ const slideTransition = { duration: 0.32, ease: "easeInOut" };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function OnboardingWizard({ onClose, referralCode = "" }: OnboardingWizardProps) {
+export default function OnboardingWizard({ onClose, referralCode = "", groupInviteCode = "" }: OnboardingWizardProps) {
   const navigate = useNavigate();
 
   // Form state
@@ -207,10 +208,14 @@ export default function OnboardingWizard({ onClose, referralCode = "" }: Onboard
           plan,
           referredById,
           favoriteTeam,
+          groupInviteCode: groupInviteCode || localStorage.getItem("pending_group_code") || null,
         }),
       });
       const regData = await regRes.json();
       if (!regRes.ok) throw new Error(regData.error || "Erro ao registrar participante.");
+
+      // Limpa o código de grupo do storage após uso
+      localStorage.removeItem("pending_group_code");
 
       if (regData.referral_code) {
         setMyReferralLink(`${window.location.origin}/?ref=${regData.referral_code}`);
