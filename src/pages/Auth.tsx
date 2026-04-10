@@ -44,21 +44,63 @@ const Auth = () => {
     setLoading(false);
   };
 
-  // ── Login de tester (username → username@bolao.test / 123456) ─────────────────
+  // ── Login de tester (auto-cria se não existir) ───────────────────────────────
   const handleTesterLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) return;
+    const slug = username.trim().toLowerCase();
+    if (!slug) return;
     setLoading(true);
-    const testEmail = `${username.trim().toLowerCase()}@bolao.test`;
-    const { error } = await supabase.auth.signInWithPassword({
+
+    const testEmail = `${slug}@bolao.test`;
+
+    // Tenta login direto primeiro
+    const { error: loginErr } = await supabase.auth.signInWithPassword({
       email: testEmail,
       password: "123456",
     });
-    if (error) {
-      toast.error(`Usuário "${username}" não encontrado como tester. Peça ao admin para ativá-lo.`);
-    } else {
-      toast.success(`Bem-vindo, @${username}!`);
+
+    if (!loginErr) {
+      toast.success(`Bem-vindo, @${slug}!`);
       navigate("/jogos");
+      setLoading(false);
+      return;
+    }
+
+    // Se não existe, cria via edge function
+    toast.loading("Criando acesso tester...", { id: "tester-create" });
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/setup-test-user`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ create_username: slug }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        toast.error(data.error || "Erro ao criar acesso", { id: "tester-create" });
+        setLoading(false);
+        return;
+      }
+
+      // Loga com o novo usuário
+      const { error: loginErr2 } = await supabase.auth.signInWithPassword({
+        email: testEmail,
+        password: "123456",
+      });
+
+      if (loginErr2) {
+        toast.error("Usuário criado, mas erro no login. Tente novamente.", { id: "tester-create" });
+      } else {
+        toast.success(`Bem-vindo, @${slug}! Acesso criado.`, { id: "tester-create" });
+        navigate("/jogos");
+      }
+    } catch {
+      toast.error("Erro de conexão.", { id: "tester-create" });
     }
     setLoading(false);
   };

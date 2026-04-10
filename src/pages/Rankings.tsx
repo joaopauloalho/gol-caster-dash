@@ -45,7 +45,7 @@ const Rankings = () => {
         const { data: memberships } = await supabase
           .from("group_members")
           .select("group_id")
-          .eq("participant_id", participant.id);
+          .eq("user_id", participant.id);
 
         if (!memberships || memberships.length === 0) {
           setParticipants([]);
@@ -55,10 +55,10 @@ const Rankings = () => {
 
         const groupIds = memberships.map((m) => m.group_id);
 
-        // 2. Get all participant_ids from those groups
+        // 2. Get all user_ids from those groups
         const { data: allMembers } = await supabase
           .from("group_members")
-          .select("participant_id")
+          .select("user_id")
           .in("group_id", groupIds);
 
         if (!allMembers || allMembers.length === 0) {
@@ -67,7 +67,8 @@ const Rankings = () => {
           return;
         }
 
-        const participantIds = [...new Set(allMembers.map((m) => m.participant_id))];
+        // user_id === participant.id (same UUID in this app)
+        const participantIds = [...new Set(allMembers.map((m) => m.user_id))];
 
         // 3. Fetch those participants ranked by points
         const { data } = await supabase

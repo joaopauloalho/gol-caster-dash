@@ -55,7 +55,7 @@ const Profile = () => {
       const { data: membership } = await supabase
         .from("group_members")
         .select("group_id")
-        .eq("participant_id", participant.id)
+        .eq("user_id", participant.id)
         .limit(1)
         .maybeSingle();
 
