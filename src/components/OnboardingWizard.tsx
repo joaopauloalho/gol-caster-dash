@@ -2,17 +2,19 @@ import { useState, useRef, KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X, ChevronRight, ArrowLeft, Check, Copy, Share2,
-  User, Mail, Lock, Phone, FileText, Calendar, CreditCard, Gift,
+  User, Mail, Lock, Phone, FileText, Calendar, CreditCard, Gift, Heart,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, formatPhone, validateCPF } from "@/lib/cpf";
 import { toast } from "sonner";
 import AddressStep from "@/components/AddressStep";
+import { TeamCombobox } from "@/components/ui/team-combobox";
+import { teams } from "@/data/teams";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type WizardStep = "name" | "contact" | "whatsapp" | "document" | "address" | "plan" | "success";
+type WizardStep = "name" | "contact" | "whatsapp" | "document" | "team" | "address" | "plan" | "success";
 
 interface AddressData {
   cep: string; logradouro: string; bairro: string;
@@ -26,13 +28,14 @@ interface OnboardingWizardProps {
 
 // ─── Step order (for direction calc) ─────────────────────────────────────────
 
-const STEPS: WizardStep[] = ["name", "contact", "whatsapp", "document", "address", "plan", "success"];
+const STEPS: WizardStep[] = ["name", "contact", "whatsapp", "document", "team", "address", "plan", "success"];
 
 const STEP_LABELS: Record<WizardStep, string> = {
   name: "Seu nome",
   contact: "Acesso",
   whatsapp: "WhatsApp",
   document: "Documento",
+  team: "Seu time",
   address: "Endereço",
   plan: "Plano",
   success: "Pronto!",
@@ -119,6 +122,7 @@ export default function OnboardingWizard({ onClose, referralCode = "" }: Onboard
   const [cpf, setCpf] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [address, setAddress] = useState<AddressData | null>(null);
+  const [favoriteTeam, setFavoriteTeam] = useState<string>("nenhum");
   const [plan, setPlan] = useState<"avista" | "parcelado">("avista");
   const [myReferralLink, setMyReferralLink] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
@@ -148,6 +152,7 @@ export default function OnboardingWizard({ onClose, referralCode = "" }: Onboard
     contact: email.includes("@") && email.includes(".") && password.length >= 6,
     whatsapp: whatsapp.replace(/\D/g, "").length >= 10,
     document: validateCPF(cpf) && birthDate.length === 10,
+    team: true, // sempre pode avançar (campo opcional)
     address: address !== null,
     plan: true,
     success: true,
@@ -201,6 +206,7 @@ export default function OnboardingWizard({ onClose, referralCode = "" }: Onboard
           city: address?.cidade ?? "",
           plan,
           referredById,
+          favoriteTeam,
         }),
       });
       const regData = await regRes.json();
@@ -411,6 +417,47 @@ export default function OnboardingWizard({ onClose, referralCode = "" }: Onboard
               </StepWrapper>
             )}
 
+            {/* ── STEP: team ───────────────────────────────────────────────── */}
+            {step === "team" && (
+              <StepWrapper
+                headline="Qual é o seu time do coração?"
+                sub="Isso aparece no seu perfil. Pode pular se preferir."
+              >
+                <div>
+                  <label className="block text-[11px] font-semibold tracking-widest uppercase text-white/40 mb-3">
+                    Time do coração
+                  </label>
+                  {/* wrapper que normaliza cores para dark bg */}
+                  <div className="[&_.border-border]:border-white/20 [&_input]:text-white [&_input]:placeholder:text-white/20 [&_button[type=button]]:text-white">
+                    <TeamCombobox
+                      value={favoriteTeam}
+                      onChange={setFavoriteTeam}
+                      dark
+                    />
+                  </div>
+                  {favoriteTeam && favoriteTeam !== "nenhum" && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-5 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/4 px-4 py-3"
+                    >
+                      <Heart className="w-4 h-4 text-red-400 fill-red-400 flex-shrink-0" />
+                      <span className="text-white/70 text-sm">
+                        {teams.find((t) => t.id === favoriteTeam)?.name}
+                      </span>
+                    </motion.div>
+                  )}
+                </div>
+                <StepNext disabled={false} onClick={() => goTo("address")} />
+                <button
+                  onClick={() => goTo("address")}
+                  className="w-full py-1 text-xs text-white/25 hover:text-white/40 transition-colors text-center"
+                >
+                  Pular esta etapa
+                </button>
+              </StepWrapper>
+            )}
+
             {/* ── STEP: address ────────────────────────────────────────────── */}
             {step === "address" && (
               <div className="flex-1 pt-8">
@@ -482,6 +529,7 @@ export default function OnboardingWizard({ onClose, referralCode = "" }: Onboard
                     ["Nome", fullName],
                     ["E-mail", email],
                     ["Cidade", `${address?.cidade}/${address?.uf}`],
+                    ["Time", teams.find((t) => t.id === favoriteTeam)?.name ?? "—"],
                   ].map(([label, val]) => (
                     <div key={label} className="flex justify-between text-sm">
                       <span className="text-white/40">{label}</span>

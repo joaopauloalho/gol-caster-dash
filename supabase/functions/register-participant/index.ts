@@ -13,7 +13,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { userId, fullName, email, whatsapp, cpf, birthDate, state, city, plan, referredById } = body;
+    const { userId, fullName, email, whatsapp, cpf, birthDate, state, city, plan, referredById, favoriteTeam } = body;
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "userId obrigatório" }), {
@@ -41,6 +41,7 @@ serve(async (req) => {
       plan,
       referred_by: referredById ?? null,
       payment_confirmed: false,
+      favorite_team: favoriteTeam ?? null,
     });
 
     if (error) {
