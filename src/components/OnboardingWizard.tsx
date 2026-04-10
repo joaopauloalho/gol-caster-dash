@@ -28,7 +28,7 @@ interface OnboardingWizardProps {
 
 // ─── Step order (for direction calc) ─────────────────────────────────────────
 
-const STEPS: WizardStep[] = ["name", "contact", "whatsapp", "document", "team", "address", "plan", "success"];
+const STEPS: WizardStep[] = ["name", "contact", "whatsapp", "document", "address", "team", "plan", "success"];
 
 const STEP_LABELS: Record<WizardStep, string> = {
   name: "Seu nome",
@@ -448,9 +448,9 @@ export default function OnboardingWizard({ onClose, referralCode = "" }: Onboard
                     </motion.div>
                   )}
                 </div>
-                <StepNext disabled={false} onClick={() => goTo("address")} />
+                <StepNext disabled={false} onClick={() => goTo("plan")} />
                 <button
-                  onClick={() => goTo("address")}
+                  onClick={() => goTo("plan")}
                   className="w-full py-1 text-xs text-white/25 hover:text-white/40 transition-colors text-center"
                 >
                   Pular esta etapa
