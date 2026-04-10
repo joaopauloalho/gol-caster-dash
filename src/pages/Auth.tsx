@@ -28,6 +28,22 @@ const Auth = () => {
     setLoading(false);
   };
 
+  // ── Magic link ────────────────────────────────────────────────────────────────
+  const handleMagicLink = async () => {
+    if (!email) { toast.error("Digite seu e-mail primeiro."); return; }
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/jogos` },
+    });
+    if (error) {
+      toast.error("Erro ao enviar link: " + error.message);
+    } else {
+      toast.success("Link enviado! Verifique seu e-mail 📧");
+    }
+    setLoading(false);
+  };
+
   // ── Login de tester (username → username@bolao.test / 123456) ─────────────────
   const handleTesterLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +142,15 @@ const Auth = () => {
               className="w-full btn-gold py-3 rounded-xl font-bold text-sm disabled:opacity-50"
             >
               {loading ? "Entrando..." : "Entrar"}
+            </button>
+
+            <button
+              type="button"
+              disabled={loading}
+              onClick={handleMagicLink}
+              className="w-full text-xs text-muted-foreground hover:text-primary transition-colors py-1 disabled:opacity-50"
+            >
+              Esqueci a senha — entrar por link no e-mail
             </button>
           </form>
         )}
