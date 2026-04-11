@@ -102,7 +102,23 @@ const ToggleField = ({ label, pointsSim, pointsNao, value, onChange, disabled }:
   );
 };
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+// ── Status badge ─────────────────────────────────────────────────────────────
+
+type MatchStatus = "open" | "closed" | "scored";
+
+function getMatchStatus(match: { startsAt?: string | null; scored?: boolean }): MatchStatus {
+  if (match.scored) return "scored";
+  if (match.startsAt && new Date(match.startsAt) <= new Date()) return "closed";
+  return "open";
+}
+
+const STATUS_BADGE: Record<MatchStatus, { label: string; className: string }> = {
+  open:   { label: "Aberto",    className: "bg-green-500/15 text-green-400 border border-green-500/25" },
+  closed: { label: "Encerrado", className: "bg-muted text-muted-foreground border border-border" },
+  scored: { label: "Pontuado",  className: "bg-primary/15 text-primary border border-primary/25" },
+};
+
+// ── Props ──────────────────────────────────────────────────────────────────���──
 
 interface MatchCardProps {
   id: number;
@@ -119,11 +135,12 @@ interface MatchCardProps {
   hasPaid?: boolean;
   scored?: boolean;
   startsAt?: string | null;
+  hasSavedPrediction?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false, scored, startsAt }: MatchCardProps) => {
+const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false, scored, startsAt, hasSavedPrediction: externalHasSaved = false }: MatchCardProps) => {
   const multiplier  = getPhaseMultiplier(stage ?? "Group Stage");
   const localTime   = getLocalTime(date, time);
   const { user }    = useAuth();
@@ -145,11 +162,18 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
   const [penalty,            setPenalty]            = useState<boolean | null>(null);
   const [firstGoal,          setFirstGoal]          = useState<"A" | "N" | "B" | null>(null);
   const [possession,         setPossession]         = useState<"A" | "B" | null>(null);
-  const [hasSavedPrediction, setHasSavedPrediction] = useState(false);
+  const [hasSavedPrediction, setHasSavedPrediction] = useState(externalHasSaved);
   const [saved,              setSaved]              = useState(false);
   const [isLocked,           setIsLocked]           = useState(() => checkLocked(date, time, startsAt, scored));
 
   const localKey = user ? `prediction:${user.id}:${id}` : null;
+  const matchStatus = getMatchStatus({ startsAt, scored });
+  const statusBadge = STATUS_BADGE[matchStatus];
+
+  // Sync external hasSaved signal (from Matches bulk fetch)
+  useEffect(() => {
+    if (externalHasSaved) setHasSavedPrediction(true);
+  }, [externalHasSaved]);
 
   // ── Deadline lock — verifica a cada 30s ─────────────────────────────────────
   useEffect(() => {
@@ -333,9 +357,13 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
           </div>
         </div>
         <div className="flex items-center gap-2 ml-3">
-          {isLocked && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
-          {!isLocked && hasSavedPrediction && filledCount === 0 && (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-secondary/20 text-secondary">✓</span>
+          {/* Status badge */}
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge.className}`}>
+            {statusBadge.label}
+          </span>
+          {/* Check se já palpitou */}
+          {hasSavedPrediction && (
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">✓</span>
           )}
           {filledCount > 0 && (
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${

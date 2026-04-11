@@ -9,9 +9,16 @@ import ReferralCard from "@/components/ReferralCard";
 import DailyChecklist from "@/components/DailyChecklist";
 import { TeamCombobox } from "@/components/ui/team-combobox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { teams } from "@/data/teams";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 const PRIZES = [
   { pos: "🥇 1º Lugar", prize: "iPhone 15 Pro Max", color: "border-primary/40 bg-primary/5" },
@@ -25,10 +32,16 @@ const PRIZES = [
 const Profile = () => {
   const { user, signOut } = useAuth();
   const { participant, hasPaid } = useParticipant();
+  const navigate = useNavigate();
 
   const [editingTeam, setEditingTeam] = useState(false);
   const [teamDraft, setTeamDraft] = useState<string>("");
   const [savingTeam, setSavingTeam] = useState(false);
+
+  // Stats reais
+  const [myRank, setMyRank] = useState<number | null>(null);
+  const [exactScores, setExactScores] = useState(0);
+  const [perfectPredictions, setPerfectPredictions] = useState(0);
 
   // Prêmios & Amigos tab state
   const [referralCount, setReferralCount] = useState(0);
@@ -37,6 +50,35 @@ const Profile = () => {
 
   const currentTeamId = participant?.favorite_team ?? "nenhum";
   const currentTeamName = teams.find((t) => t.id === currentTeamId)?.name ?? "Nenhum / Não torço";
+
+  // Fetch stats reais
+  useEffect(() => {
+    if (!participant) return;
+    const fetchStats = async () => {
+      // Posição no ranking
+      const { data: rankData } = await supabase
+        .from("participants_public_view")
+        .select("user_id, bonus_points")
+        .or("payment_confirmed.eq.true,is_test_user.eq.true")
+        .order("bonus_points", { ascending: false })
+        .limit(500);
+      if (rankData) {
+        const pos = rankData.findIndex(p => p.user_id === participant.id) + 1;
+        setMyRank(pos > 0 ? pos : null);
+      }
+      // Placares exatos e gabaritos
+      const { data: predsData } = await supabase
+        .from("predictions")
+        .select("points_earned")
+        .eq("user_id", participant.id)
+        .gt("points_earned", 0);
+      if (predsData) {
+        setExactScores(predsData.filter(p => (p.points_earned ?? 0) >= 25).length);
+        setPerfectPredictions(predsData.filter(p => (p.points_earned ?? 0) >= 100).length);
+      }
+    };
+    fetchStats();
+  }, [participant]);
 
   // Fetch referral count + first group invite code
   useEffect(() => {
@@ -201,10 +243,10 @@ const Profile = () => {
             {/* Stats */}
             <div className="grid grid-cols-2 gap-3">
               {[
-                { icon: Trophy, label: "Posição", value: "#—", color: "text-primary" },
+                { icon: Trophy, label: "Posição", value: myRank ? `#${myRank}` : "#—", color: "text-primary" },
                 { icon: Star, label: "Pontos", value: String(participant?.bonus_points || 0), color: "text-foreground" },
-                { icon: Target, label: "Placares Exatos", value: "0", color: "text-secondary" },
-                { icon: Zap, label: "Gabaritos", value: "0", color: "text-primary" },
+                { icon: Target, label: "Placares Exatos", value: String(exactScores), color: "text-secondary" },
+                { icon: Zap, label: "Gabaritos", value: String(perfectPredictions), color: "text-primary" },
               ].map(({ icon: Icon, label, value, color }) => (
                 <div key={label} className="bg-glass rounded-xl p-4 text-center">
                   <Icon className={`w-5 h-5 mx-auto mb-2 ${color}`} />
@@ -221,19 +263,43 @@ const Profile = () => {
 
             {/* Actions */}
             <div className="space-y-2">
-              <button className="w-full bg-glass rounded-xl p-4 text-left flex items-center gap-3 text-foreground text-sm font-medium">
+              <button
+                onClick={() => navigate("/jogos")}
+                className="w-full bg-glass rounded-xl p-4 text-left flex items-center gap-3 text-foreground text-sm font-medium"
+              >
                 <Trophy className="w-4 h-4 text-primary" /> Meus Palpites
               </button>
-              <button className="w-full bg-glass rounded-xl p-4 text-left flex items-center gap-3 text-foreground text-sm font-medium">
-                <Star className="w-4 h-4 text-primary" /> Histórico de Pontos
+              <button
+                onClick={() => navigate("/rankings")}
+                className="w-full bg-glass rounded-xl p-4 text-left flex items-center gap-3 text-foreground text-sm font-medium"
+              >
+                <Star className="w-4 h-4 text-primary" /> Minha Posição no Ranking
               </button>
               {user && (
-                <button
-                  onClick={signOut}
-                  className="w-full bg-glass rounded-xl p-4 text-left flex items-center gap-3 text-destructive text-sm font-medium"
-                >
-                  <LogOut className="w-4 h-4" /> Sair
-                </button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button className="w-full bg-glass rounded-xl p-4 text-left flex items-center gap-3 text-destructive text-sm font-medium">
+                      <LogOut className="w-4 h-4" /> Sair
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Sair da conta?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Você precisará fazer login novamente para acessar seus palpites.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={signOut}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        Sair
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               )}
             </div>
           </TabsContent>

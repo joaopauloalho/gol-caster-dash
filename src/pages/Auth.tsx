@@ -12,6 +12,10 @@ const Auth = () => {
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showReset, setShowReset] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const inviteCode = searchParams.get("invite") || "";
@@ -53,6 +57,22 @@ const Auth = () => {
       navigate("/jogos");
     }
     setLoading(false);
+  };
+
+  // ── Recuperação de senha ──────────────────────────────────────────────────────
+  const handleReset = async () => {
+    if (!resetEmail) return;
+    setResetLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: `${window.location.origin}/auth`,
+    });
+    if (error) {
+      toast.error("Erro ao enviar e-mail. Verifique o endereço.");
+    } else {
+      setResetSent(true);
+      toast.success("E-mail de recuperação enviado!");
+    }
+    setResetLoading(false);
   };
 
   // ── Magic link ────────────────────────────────────────────────────────────────
@@ -187,8 +207,54 @@ const Auth = () => {
               onClick={handleMagicLink}
               className="w-full text-xs text-muted-foreground hover:text-primary transition-colors py-1 disabled:opacity-50"
             >
-              Esqueci a senha — entrar por link no e-mail
+              Entrar por link mágico no e-mail
             </button>
+
+            {!showReset ? (
+              <button
+                type="button"
+                onClick={() => setShowReset(true)}
+                className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors mt-1"
+              >
+                Esqueci minha senha
+              </button>
+            ) : (
+              <div className="mt-2 space-y-3 border-t border-border pt-4">
+                {resetSent ? (
+                  <p className="text-xs text-center text-green-400">
+                    ✅ E-mail enviado! Verifique sua caixa de entrada.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Digite o e-mail da sua conta e enviaremos um link para redefinir sua senha.
+                    </p>
+                    <input
+                      type="email"
+                      placeholder="seu@email.com"
+                      value={resetEmail}
+                      onChange={e => setResetEmail(e.target.value)}
+                      className="w-full bg-muted border border-border rounded-lg px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleReset}
+                      disabled={resetLoading || !resetEmail}
+                      className="w-full py-2.5 rounded-xl bg-muted text-foreground text-sm font-bold disabled:opacity-50 transition-colors hover:bg-muted/80"
+                    >
+                      {resetLoading ? "Enviando..." : "Enviar link de recuperação"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowReset(false); setResetEmail(""); }}
+                      className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      Voltar ao login
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </form>
         )}
 

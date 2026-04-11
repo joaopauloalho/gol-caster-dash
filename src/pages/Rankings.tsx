@@ -3,6 +3,7 @@ import { Trophy, Crown, Medal, Award, MapPin, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useParticipant } from "@/hooks/useParticipant";
+import { useNavigate } from "react-router-dom";
 
 interface RankingUser {
   user_id: string;
@@ -31,6 +32,7 @@ const Rankings = () => {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { participant } = useParticipant();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchRanking = async () => {
@@ -113,9 +115,13 @@ const Rankings = () => {
 
   const tabs: { key: FilterTab; label: string; icon: React.ReactNode }[] = [
     { key: "geral", label: "Geral", icon: "🏆" },
-    { key: "estado", label: "Meu Estado", icon: <MapPin className="w-3 h-3" /> },
-    { key: "cidade", label: "Minha Cidade", icon: <MapPin className="w-3 h-3" /> },
-    { key: "grupo", label: "Grupo", icon: <Users className="w-3 h-3" /> },
+    ...(participant?.state ? [
+      { key: "estado" as FilterTab, label: participant.state, icon: <MapPin className="w-3 h-3" /> },
+    ] : []),
+    ...(participant?.city ? [
+      { key: "cidade" as FilterTab, label: participant.city, icon: <MapPin className="w-3 h-3" /> },
+    ] : []),
+    { key: "grupo" as FilterTab, label: "Grupo", icon: <Users className="w-3 h-3" /> },
   ];
 
   return (
@@ -165,11 +171,25 @@ const Rankings = () => {
       {loading ? (
         <div className="text-center py-12 text-muted-foreground text-sm">Carregando ranking...</div>
       ) : participants.length === 0 ? (
-        <div className="text-center py-12 text-muted-foreground text-sm">
-          {tab === "grupo"
-            ? "Entre em um grupo para ver o ranking dos membros"
-            : "Nenhum participante encontrado"}
-        </div>
+        tab === "grupo" && !participant ? (
+          <div className="text-center py-12 px-4">
+            <Users className="w-10 h-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm font-bold text-foreground mb-1">Faça login para ver seu grupo</p>
+            <p className="text-xs text-muted-foreground mb-4">Entre na sua conta para ver o ranking dos membros do seu grupo.</p>
+            <button
+              onClick={() => navigate("/auth")}
+              className="px-6 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-bold"
+            >
+              Fazer login
+            </button>
+          </div>
+        ) : (
+          <div className="text-center py-12 text-muted-foreground text-sm">
+            {tab === "grupo"
+              ? "Entre em um grupo para ver o ranking dos membros"
+              : "Nenhum participante encontrado"}
+          </div>
+        )
       ) : (
         <>
           {/* Top 3 Podium */}

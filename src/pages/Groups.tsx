@@ -80,10 +80,8 @@ const Groups = () => {
         console.warn("group_members insert:", memberErr.message);
       }
 
-      toast.success("Grupo criado com sucesso!");
-      setGroupName("");
-      setShowCreate(false);
-      fetchGroups();
+      toast.success(`Grupo "${group.name}" criado!`);
+      navigate(`/grupos/${group.id}`);
     } catch (err: any) {
       toast.error(err.message || "Erro ao criar grupo.");
     } finally {
@@ -92,7 +90,12 @@ const Groups = () => {
   };
 
   const handleJoin = async () => {
-    if (!user || !joinCode.trim()) return;
+    const code = joinCode.trim();
+    if (!user || !code) return;
+    if (code.length < 4) {
+      toast.error("Código inválido. Verifique e tente novamente.");
+      return;
+    }
     setJoining(true);
     try {
       const { data: group, error: groupError } = await supabase
