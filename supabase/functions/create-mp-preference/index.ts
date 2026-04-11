@@ -18,8 +18,8 @@ const corsHeaders = {
 
 // Valores canônicos dos planos (em centavos) — nunca vêm do cliente
 const PLAN_AMOUNTS: Record<string, number> = {
-  "pro-avista":    2500,  // R$25,00
-  "pro-parcelado": 3000,  // R$30,00
+  "pro-avista":    25000,  // R$250,00  ← fonte única de verdade; UI deve espelhar este valor
+  "pro-parcelado": 30000,  // R$300,00  (3x R$100)
 };
 
 serve(async (req) => {

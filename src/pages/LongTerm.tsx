@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { Trophy, Star, Target, Lock, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useParticipant } from "@/hooks/useParticipant";
+import { useSubscription } from "@/hooks/useSubscription";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 const teams = [
@@ -59,6 +62,9 @@ const SelectCard = ({ title, points, icon, options, value, onChange }: SelectCar
 
 const LongTerm = () => {
   const { user } = useAuth();
+  const { hasPaid } = useParticipant();
+  const { isActive } = useSubscription();
+  const navigate = useNavigate();
   const [champion, setChampion] = useState("");
   const [finalist1, setFinalist1] = useState("");
   const [finalist2, setFinalist2] = useState("");
@@ -159,6 +165,14 @@ const LongTerm = () => {
           onClick={async () => {
             if (!user) {
               toast.error("Faça login para salvar previsões.");
+              navigate("/auth");
+              return;
+            }
+            // Gate: mesmo critério de MatchCard (subscription ativa | pago | tester)
+            if (!isActive && !hasPaid) {
+              toast.error("Assine o plano para salvar previsões!", {
+                action: { label: "Ver Planos", onClick: () => navigate("/planos") },
+              });
               return;
             }
             const { error } = await supabase.from("tournament_predictions").upsert(

@@ -68,11 +68,12 @@ const Rankings = () => {
 
         const participantIds = [...new Set(allMembers.map((m) => m.user_id))];
 
-        // 3. Fetch those participants ranked by points
+        // 3. Fetch those participants ranked by points (apenas quem tem acesso)
         const { data } = await supabase
           .from("participants_public_view")
           .select("user_id, full_name, username, city, state, bonus_points")
           .in("user_id", participantIds)
+          .or("payment_confirmed.eq.true,is_test_user.eq.true")
           .order("bonus_points", { ascending: false })
           .limit(50);
 
@@ -82,12 +83,12 @@ const Rankings = () => {
       }
 
       // Other tabs
-      // participants_public_view não expõe payment_confirmed (coluna PII removida).
-      // Decisão de produto: ranking é público para todos os inscritos; testers
-      // aparecem no ranking com is_test_user=true, mas não há filtro de pagamento aqui.
+      // Decisão de produto: ranking mostra apenas quem tem acesso ao jogo
+      // (payment_confirmed=true OU is_test_user=true)
       let query = supabase
         .from("participants_public_view")
         .select("user_id, full_name, username, city, state, bonus_points")
+        .or("payment_confirmed.eq.true,is_test_user.eq.true")
         .order("bonus_points", { ascending: false })
         .limit(50);
 

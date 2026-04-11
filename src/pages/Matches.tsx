@@ -15,7 +15,9 @@ const Matches = () => {
   const { hasPaid, loading: partLoading } = useParticipant();
   const navigate = useNavigate();
 
-  const showBlur = false; // desabilitado para testes
+  // showBlur: defina como `!hasPaid` para ativar paywall visual na página de jogos.
+  // Mantido false enquanto em testes; o gate real está em MatchCard.handleSave.
+  const showBlur = false;
 
   useEffect(() => {
     setLoading(true);
@@ -79,7 +81,7 @@ const Matches = () => {
                 </div>
                 <div className="space-y-3">
                   {matches.map((match) => (
-                    <MatchCard key={match.matchNumber} {...match} />
+                    <MatchCard key={match.matchNumber} {...match} hasPaid={hasPaid} />
                   ))}
                 </div>
               </div>

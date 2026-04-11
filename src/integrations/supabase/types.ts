@@ -388,6 +388,7 @@ export type Database = {
           plan: string
           favorite_team: string | null
           is_test_user: boolean
+          payment_confirmed: boolean
         }
       }
     }

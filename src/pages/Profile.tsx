@@ -43,11 +43,11 @@ const Profile = () => {
     if (!participant) return;
 
     const fetchExtras = async () => {
-      // Count confirmed referrals
+      // Count confirmed referrals — referred_by é FK participants(id), não referral_code
       const { count } = await supabase
         .from("participants")
         .select("id", { count: "exact", head: true })
-        .eq("referred_by", participant.referral_code)
+        .eq("referred_by", participant.id)
         .eq("payment_confirmed", true);
       setReferralCount(count ?? 0);
 

@@ -5,7 +5,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Check, Trophy, Loader2, ChevronDown, ChevronUp, Zap } from "lucide-react";
 
-const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || "";
 
 interface Participant {
   id: string;
@@ -58,7 +57,8 @@ const Admin = () => {
 
   useEffect(() => {
     if (!user) { navigate("/auth"); return; }
-    if (user.email !== ADMIN_EMAIL) { navigate("/"); return; }
+    // Usa app_metadata.role (mesmo critério das edge functions) — não depende de email
+    if (user.app_metadata?.role !== "admin") { navigate("/"); return; }
     fetchAll();
   }, [user]);
 

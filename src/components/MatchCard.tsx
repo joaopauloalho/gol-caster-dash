@@ -80,9 +80,11 @@ interface MatchCardProps {
   matchNumber: number;
   date?: string;
   stage?: string;
+  /** hasPaid vem de useParticipant no pai (Matches.tsx) — evita N queries por card */
+  hasPaid?: boolean;
 }
 
-const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: MatchCardProps) => {
+const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date, hasPaid = false }: MatchCardProps) => {
   const multiplier = getPhaseMultiplier(stage ?? "Group Stage");
   const localTime = getLocalTime(date, time);
   const { user } = useAuth();
@@ -150,7 +152,8 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date }: 
       navigate("/auth");
       return;
     }
-    if (!isActive) {
+    // Gate: subscription ativa OU payment_confirmed OU tester
+    if (!isActive && !hasPaid) {
       toast.error("Assine o plano para participar da Copa!", {
         action: { label: "Ver Planos", onClick: () => navigate("/planos") },
       });

@@ -36,11 +36,7 @@ const PaymentReturn = () => {
         clearInterval(interval);
         setChecking(false);
         if (data?.payment_status === "active") {
-          // Garante payment_confirmed no participant também
-          await supabase
-            .from("participants")
-            .update({ payment_confirmed: true })
-            .eq("user_id", user.id);
+          // payment_confirmed é atualizado pelo webhook (service role) — não tentar aqui
           setTimeout(() => navigate("/jogos"), 2000);
         }
       }
