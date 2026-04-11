@@ -73,7 +73,7 @@ const GroupDetail = () => {
 
     // Usa participants_public_view (sem PII: sem CPF, whatsapp, email)
     const { data: parts } = await supabase
-      .from("participants_public_view" as any)
+      .from("participants_public_view")
       .select("user_id, full_name, username, state, city, bonus_points, plan, favorite_team")
       .in("user_id", allUserIds);
 

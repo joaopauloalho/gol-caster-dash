@@ -71,7 +71,7 @@ const Auth = () => {
     setLoading(false);
   };
 
-  // ── Login de tester (auto-cria se não existir) ───────────────────────────────
+  // ── Login de tester (conta deve ser criada pelo admin via setup-test-user) ─────
   const handleTesterLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const slug = username.trim().toLowerCase();

@@ -205,6 +205,10 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
 
       if (!userId) throw new Error("Não foi possível identificar o usuário.");
 
+      // Obter JWT da sessão activa para autenticar nas edge functions
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Sessão não encontrada. Tente novamente.");
+
       let referredById: string | null = null;
       if (referralCode) {
         const { data: refParticipant } = await supabase
@@ -217,10 +221,15 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const authHeaders = {
+        "Content-Type": "application/json",
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${session.access_token}`,
+      };
 
       const regRes = await fetch(`${supabaseUrl}/functions/v1/register-participant`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: supabaseKey },
+        headers: authHeaders,
         body: JSON.stringify({
           userId,
           fullName: fullName.trim(),
@@ -252,7 +261,7 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
 
       const prefRes = await fetch(`${supabaseUrl}/functions/v1/create-mp-preference`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: supabaseKey },
+        headers: authHeaders,
         body: JSON.stringify({
           plan: planId,
           amount: planAmount,

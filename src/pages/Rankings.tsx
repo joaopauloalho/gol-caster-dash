@@ -70,7 +70,7 @@ const Rankings = () => {
 
         // 3. Fetch those participants ranked by points
         const { data } = await supabase
-          .from("participants_public_view" as any)
+          .from("participants_public_view")
           .select("user_id, full_name, username, city, state, bonus_points")
           .in("user_id", participantIds)
           .order("bonus_points", { ascending: false })
@@ -82,8 +82,11 @@ const Rankings = () => {
       }
 
       // Other tabs
+      // participants_public_view não expõe payment_confirmed (coluna PII removida).
+      // Decisão de produto: ranking é público para todos os inscritos; testers
+      // aparecem no ranking com is_test_user=true, mas não há filtro de pagamento aqui.
       let query = supabase
-        .from("participants_public_view" as any)
+        .from("participants_public_view")
         .select("user_id, full_name, username, city, state, bonus_points")
         .order("bonus_points", { ascending: false })
         .limit(50);
