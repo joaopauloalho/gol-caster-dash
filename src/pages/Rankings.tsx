@@ -5,13 +5,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useParticipant } from "@/hooks/useParticipant";
 
 interface RankingUser {
-  id: string;
+  user_id: string;
   full_name: string;
   username: string | null;
   city: string;
   state: string;
   bonus_points: number;
-  avatar_url: string | null;
 }
 
 const PosIcon = ({ pos }: { pos: number }) => {
@@ -67,15 +66,13 @@ const Rankings = () => {
           return;
         }
 
-        // user_id === participant.id (same UUID in this app)
         const participantIds = [...new Set(allMembers.map((m) => m.user_id))];
 
         // 3. Fetch those participants ranked by points
         const { data } = await supabase
-          .from("participants")
-          .select("id, full_name, username, city, state, bonus_points, avatar_url")
-          .eq("payment_confirmed", true)
-          .in("id", participantIds)
+          .from("participants_public_view" as any)
+          .select("user_id, full_name, username, city, state, bonus_points")
+          .in("user_id", participantIds)
           .order("bonus_points", { ascending: false })
           .limit(50);
 
@@ -86,9 +83,8 @@ const Rankings = () => {
 
       // Other tabs
       let query = supabase
-        .from("participants")
-        .select("id, full_name, username, city, state, bonus_points, avatar_url")
-        .eq("payment_confirmed", true)
+        .from("participants_public_view" as any)
+        .select("user_id, full_name, username, city, state, bonus_points")
         .order("bonus_points", { ascending: false })
         .limit(50);
 
@@ -107,7 +103,7 @@ const Rankings = () => {
   }, [tab, participant]);
 
   const myPos = participant
-    ? participants.findIndex((p) => p.id === participant.id) + 1
+    ? participants.findIndex((p) => p.user_id === participant.id) + 1
     : 0;
   const leaderPoints = participants[0]?.bonus_points || 0;
 
@@ -180,7 +176,7 @@ const Rankings = () => {
                   const heights = ["h-20", "h-28", "h-16"];
                   const posNum = i === 0 ? 2 : i === 1 ? 1 : 3;
                   return (
-                    <div key={p.id} className="flex flex-col items-center flex-1">
+                    <div key={p.user_id} className="flex flex-col items-center flex-1">
                       <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-bold text-foreground mb-1">
                         {p.full_name.charAt(0)}
                       </div>
@@ -205,9 +201,9 @@ const Rankings = () => {
           <div className="px-4 space-y-2">
             {participants.slice(3).map((p, idx) => (
               <div
-                key={p.id}
+                key={p.user_id}
                 className={`bg-glass rounded-xl p-3 flex items-center gap-3 ${
-                  p.id === participant?.id ? "ring-1 ring-primary" : ""
+                  p.user_id === participant?.id ? "ring-1 ring-primary" : ""
                 }`}
               >
                 <PosIcon pos={idx + 4} />
@@ -217,7 +213,7 @@ const Rankings = () => {
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm text-foreground truncate">
                     {displayName(p)}
-                    {p.id === participant?.id && (
+                    {p.user_id === participant?.id && (
                       <span className="ml-1.5 text-[10px] text-primary font-black">você</span>
                     )}
                   </div>

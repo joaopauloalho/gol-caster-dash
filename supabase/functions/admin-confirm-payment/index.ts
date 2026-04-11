@@ -6,7 +6,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ADMIN_EMAIL = Deno.env.get("ADMIN_EMAIL") || "";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -24,7 +23,7 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
     if (authErr || !user) throw new Error("Token inválido");
-    if (user.email !== ADMIN_EMAIL) throw new Error("Sem permissão de admin");
+    if (user.app_metadata?.role !== "admin") throw new Error("Sem permissão de admin");
 
     const { participant_id, user_id, plan } = await req.json();
 

@@ -95,44 +95,8 @@ const Auth = () => {
       return;
     }
 
-    // Se não existe, cria via edge function
-    toast.loading("Criando acesso tester...", { id: "tester-create" });
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/setup-test-user`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          },
-          body: JSON.stringify({ create_username: slug }),
-        }
-      );
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        toast.error(data.error || "Erro ao criar acesso", { id: "tester-create" });
-        setLoading(false);
-        return;
-      }
-
-      // Loga com o novo usuário
-      const { error: loginErr2 } = await supabase.auth.signInWithPassword({
-        email: testEmail,
-        password: "123456",
-      });
-
-      if (loginErr2) {
-        toast.error("Usuário criado, mas erro no login. Tente novamente.", { id: "tester-create" });
-      } else {
-        const { data: { user: u } } = await supabase.auth.getUser();
-        if (u) await joinGroupIfInvited(u.id);
-        toast.success(`Bem-vindo, @${slug}! Acesso criado.`, { id: "tester-create" });
-        navigate("/jogos");
-      }
-    } catch {
-      toast.error("Erro de conexão.", { id: "tester-create" });
-    }
+    // Conta não encontrada — apenas admin pode criar testers
+    toast.error("Conta não encontrada. Peça ao admin para criar seu acesso.");
     setLoading(false);
   };
 
@@ -234,7 +198,7 @@ const Auth = () => {
             <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 flex items-start gap-2.5">
               <Zap className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Digite seu <strong className="text-foreground">username</strong> e entre direto — criamos sua conta automaticamente se ainda não existir.
+                Digite seu <strong className="text-foreground">username</strong> de tester e a senha padrão para entrar.
                 {inviteCode && (
                   <> Você vai entrar na liga <strong className="text-primary">#{inviteCode.toUpperCase()}</strong> automaticamente.</>
                 )}

@@ -12,10 +12,32 @@ serve(async (req) => {
   }
 
   try {
+    // ── Verificação de admin ──────────────────────────────────────────────────
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Autenticação obrigatória" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user: caller }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !caller) {
+      return new Response(JSON.stringify({ error: "Token inválido" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    if (caller.app_metadata?.role !== "admin") {
+      return new Response(JSON.stringify({ error: "Sem permissão de admin" }), {
+        status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    // ── Fim verificação ───────────────────────────────────────────────────────
 
     const body = await req.json();
 

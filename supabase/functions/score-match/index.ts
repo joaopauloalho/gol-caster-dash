@@ -12,7 +12,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const ADMIN_EMAIL = Deno.env.get("ADMIN_EMAIL") || "";
 
 const MULTIPLIERS: Record<string, number> = {
   "Group Stage": 1, "Grupos": 1, "Brasileirão": 1,
@@ -50,7 +49,7 @@ serve(async (req) => {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (user.email !== ADMIN_EMAIL) {
+    if (user.app_metadata?.role !== "admin") {
       return new Response(JSON.stringify({ error: "Sem permissão de admin" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
