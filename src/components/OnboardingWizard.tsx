@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { formatCPF, formatPhone, validateCPF } from "@/lib/cpf";
 import { toast } from "sonner";
 import AddressStep from "@/components/AddressStep";
+import LgpdNotice from "@/components/LgpdNotice";
 import { TeamCombobox } from "@/components/ui/team-combobox";
 import { teams } from "@/data/teams";
 
@@ -478,6 +479,7 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
                 headline="CPF e data de nascimento."
                 sub="Necessário para emissão de prêmios."
               >
+                <LgpdNotice />
                 <UInput
                   label="CPF"
                   icon={<FileText className="w-4 h-4" />}
