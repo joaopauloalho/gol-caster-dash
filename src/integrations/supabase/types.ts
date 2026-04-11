@@ -81,6 +81,7 @@ export type Database = {
           team_a: string
           team_b: string
           time: string
+          espn_id: string | null
         }
         Insert: {
           city: string
@@ -95,6 +96,7 @@ export type Database = {
           team_a: string
           team_b: string
           time: string
+          espn_id?: string | null
         }
         Update: {
           city?: string
@@ -109,6 +111,7 @@ export type Database = {
           team_a?: string
           team_b?: string
           time?: string
+          espn_id?: string | null
         }
         Relationships: []
       }
@@ -291,6 +294,98 @@ export type Database = {
           },
         ]
       }
+      site_settings: {
+        Row: {
+          key: string
+          value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          key: string
+          value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          key?: string
+          value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      coupons: {
+        Row: {
+          id: string
+          code: string
+          kind: "percent" | "fixed"
+          value: number
+          max_uses: number | null
+          uses_count: number
+          valid_from: string
+          valid_until: string | null
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          kind: "percent" | "fixed"
+          value: number
+          max_uses?: number | null
+          uses_count?: number
+          valid_from?: string
+          valid_until?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          kind?: "percent" | "fixed"
+          value?: number
+          max_uses?: number | null
+          uses_count?: number
+          valid_from?: string
+          valid_until?: string | null
+          active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      coupon_redemptions: {
+        Row: {
+          id: string
+          coupon_id: string
+          user_id: string
+          participant_id: string | null
+          redeemed_at: string
+        }
+        Insert: {
+          id?: string
+          coupon_id: string
+          user_id: string
+          participant_id?: string | null
+          redeemed_at?: string
+        }
+        Update: {
+          id?: string
+          coupon_id?: string
+          user_id?: string
+          participant_id?: string | null
+          redeemed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_redemptions_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhook_events: {
         Row: {
           id: string
@@ -391,9 +486,22 @@ export type Database = {
           payment_confirmed: boolean
         }
       }
+      site_settings_public: {
+        Row: {
+          key: string
+          value: Json
+        }
+      }
     }
     Functions: {
-      [_ in never]: never
+      admin_kpis: {
+        Args: Record<string, never>
+        Returns: Json
+      }
+      is_admin: {
+        Args: Record<string, never>
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

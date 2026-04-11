@@ -1,13 +1,16 @@
-import { useState } from "react";
-import { ChevronDown, ChevronUp, Check, Zap, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { ChevronDown, ChevronUp, Check, Zap, Loader2, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getPhaseMultiplier, parseMatchDateTime } from "@/data/matches";
+import { MAX_BASE_POINTS } from "@/lib/scoring";
 
-// ISO 3166-1 alpha-2 codes for flagcdn.com (keyed by translated PT-BR name)
+// ── Flag helpers ──────────────────────────────────────────────────────────────
+
 const FLAG_CODE: Record<string, string> = {
   "México": "mx", "Estados Unidos": "us", "Canadá": "ca", "Costa Rica": "cr",
   "Panamá": "pa", "Honduras": "hn", "El Salvador": "sv", "Jamaica": "jm",
@@ -31,42 +34,70 @@ const FLAG_CODE: Record<string, string> = {
   "Japão": "jp", "Coreia do Sul": "kr", "Austrália": "au",
   "Arábia Saudita": "sa", "Irã": "ir", "Catar": "qa", "China": "cn",
   "Iraque": "iq", "Jordânia": "jo", "Emirados Árabes": "ae",
-  "Indonésia": "id", "Uzbequistão": "uz", "Nova Zelândia": "nz",
-  "Curaçao": "cw",
+  "Indonésia": "id", "Uzbequistão": "uz", "Nova Zelândia": "nz", "Curaçao": "cw",
 };
 
-function getFlagUrl(teamName: string): string | null {
-  const code = FLAG_CODE[teamName];
-  if (!code) return null;
-  return `https://flagcdn.com/w80/${code}.png`;
+function getFlagUrl(name: string): string | null {
+  const c = FLAG_CODE[name];
+  return c ? `https://flagcdn.com/w80/${c}.png` : null;
 }
 
 function getLocalTime(date: string | undefined, time: string): string {
   if (!date) return time;
   try {
-    const dt = parseMatchDateTime(date, time);
-    return dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } catch {
-    return time;
-  }
+    return parseMatchDateTime(date, time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch { return time; }
 }
 
-interface FlagImgProps {
-  teamName: string;
-  className?: string;
+/** Retorna true se faltam ≤30 min para o início (ou jogo já começou) */
+function checkLocked(date: string | undefined, time: string): boolean {
+  if (!date) return false;
+  try {
+    const start = parseMatchDateTime(date, time);
+    return Date.now() >= start.getTime() - 30 * 60 * 1000;
+  } catch { return false; }
 }
-const FlagImg = ({ teamName, className }: FlagImgProps) => {
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+const FlagImg = ({ teamName, className }: { teamName: string; className?: string }) => {
   const src = getFlagUrl(teamName);
   if (!src) return null;
+  return <img src={src} alt="" className={className} onError={e => { e.currentTarget.style.display = "none"; }} />;
+};
+
+interface ToggleFieldProps {
+  label: string;
+  pointsSim: number;
+  pointsNao: number;
+  value: boolean | null;
+  onChange: (v: boolean | null) => void;
+  disabled?: boolean;
+}
+const ToggleField = ({ label, pointsSim, pointsNao, value, onChange, disabled }: ToggleFieldProps) => {
+  const ptLabel = pointsSim === pointsNao ? `${pointsSim} pts` : `Sim ${pointsSim} / Não ${pointsNao} pts`;
   return (
-    <img
-      src={src}
-      alt=""
-      className={className}
-      onError={(e) => { e.currentTarget.style.display = "none"; }}
-    />
+    <div className="bg-muted/50 rounded-lg p-3">
+      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+        {label} <span className="text-primary">({ptLabel})</span>
+      </label>
+      <div className="flex gap-2">
+        <button
+          onClick={() => !disabled && onChange(value === true ? null : true)}
+          disabled={disabled}
+          className={`flex-1 py-2 rounded-md text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${value === true ? "bg-secondary text-secondary-foreground" : "bg-muted text-muted-foreground"}`}
+        >Sim</button>
+        <button
+          onClick={() => !disabled && onChange(value === false ? null : false)}
+          disabled={disabled}
+          className={`flex-1 py-2 rounded-md text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${value === false ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"}`}
+        >Não</button>
+      </div>
+    </div>
   );
 };
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 
 interface MatchCardProps {
   id: number;
@@ -80,61 +111,118 @@ interface MatchCardProps {
   matchNumber: number;
   date?: string;
   stage?: string;
-  /** hasPaid vem de useParticipant no pai (Matches.tsx) — evita N queries por card */
   hasPaid?: boolean;
 }
 
-const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date, hasPaid = false }: MatchCardProps) => {
-  const multiplier = getPhaseMultiplier(stage ?? "Group Stage");
-  const localTime = getLocalTime(date, time);
-  const { user } = useAuth();
-  const { isActive } = useSubscription();
-  const navigate = useNavigate();
-  const [expanded, setExpanded] = useState(false);
-  const [predictionLoaded, setPredictionLoaded] = useState(false);
-  const [scoreA, setScoreA] = useState<number | "">("");
-  const [scoreB, setScoreB] = useState<number | "">("");
-  const [winner, setWinner] = useState<"A" | "X" | "B" | null>(null);
-  const [goalFirstHalf, setGoalFirstHalf] = useState<boolean | null>(null);
-  const [goalSecondHalf, setGoalSecondHalf] = useState<boolean | null>(null);
-  const [redCard, setRedCard] = useState<boolean | null>(null);
-  const [penalty, setPenalty] = useState<boolean | null>(null);
-  const [firstGoal, setFirstGoal] = useState<"A" | "N" | "B" | null>(null);
-  const [possession, setPossession] = useState<"A" | "B" | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [hasSavedPrediction, setHasSavedPrediction] = useState(false);
-  const [loadingPrediction, setLoadingPrediction] = useState(false);
+// ── Component ─────────────────────────────────────────────────────────────────
 
-  const loadExistingPrediction = async () => {
+const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false }: MatchCardProps) => {
+  const multiplier  = getPhaseMultiplier(stage ?? "Group Stage");
+  const localTime   = getLocalTime(date, time);
+  const { user }    = useAuth();
+  const { isActive }= useSubscription();
+  const { settings }= useSiteSettings();
+  const paywallActive = settings.feature_flags?.paywall_active ?? true;
+  const navigate    = useNavigate();
+
+  // ── State ───────────────────────────────────────────────────────────────────
+  const [expanded,           setExpanded]           = useState(false);
+  const [predictionLoaded,   setPredictionLoaded]   = useState(false);
+  const [loadingPrediction,  setLoadingPrediction]  = useState(false);
+  const [scoreA,             setScoreA]             = useState<number | "">("");
+  const [scoreB,             setScoreB]             = useState<number | "">("");
+  const [winner,             setWinner]             = useState<"A" | "X" | "B" | null>(null);
+  const [goalFirstHalf,      setGoalFirstHalf]      = useState<boolean | null>(null);
+  const [goalSecondHalf,     setGoalSecondHalf]     = useState<boolean | null>(null);
+  const [redCard,            setRedCard]            = useState<boolean | null>(null);
+  const [penalty,            setPenalty]            = useState<boolean | null>(null);
+  const [firstGoal,          setFirstGoal]          = useState<"A" | "N" | "B" | null>(null);
+  const [possession,         setPossession]         = useState<"A" | "B" | null>(null);
+  const [hasSavedPrediction, setHasSavedPrediction] = useState(false);
+  const [saved,              setSaved]              = useState(false);
+  const [isLocked,           setIsLocked]           = useState(() => checkLocked(date, time));
+
+  const localKey = user ? `prediction:${user.id}:${id}` : null;
+
+  // ── Deadline lock — verifica a cada 30s ─────────────────────────────────────
+  useEffect(() => {
+    setIsLocked(checkLocked(date, time));
+    const t = setInterval(() => setIsLocked(checkLocked(date, time)), 30_000);
+    return () => clearInterval(t);
+  }, [date, time]);
+
+  // ── Hydration 1: localStorage (síncrono, sem flicker) ───────────────────────
+  useEffect(() => {
+    if (!localKey) return;
+    try {
+      const raw = localStorage.getItem(localKey);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.home_score       != null) setScoreA(d.home_score);
+      if (d.away_score       != null) setScoreB(d.away_score);
+      if (d.winner_pick)              setWinner(d.winner_pick);
+      if (d.goal_first_half  != null) setGoalFirstHalf(d.goal_first_half);
+      if (d.goal_second_half != null) setGoalSecondHalf(d.goal_second_half);
+      if (d.has_red_card     != null) setRedCard(d.has_red_card);
+      if (d.has_penalty      != null) setPenalty(d.has_penalty);
+      if (d.first_to_score)           setFirstGoal(d.first_to_score);
+      if (d.possession_winner)        setPossession(d.possession_winner);
+      setHasSavedPrediction(true);
+    } catch { /* corrompido — ignorar */ }
+  }, [localKey]);
+
+  // ── Hydration 2: Supabase (automático ao montar, servidor manda) ─────────────
+  const fetchFromServer = useCallback(async () => {
     if (!user || predictionLoaded) return;
     setPredictionLoaded(true);
     setLoadingPrediction(true);
+
     const { data } = await supabase
       .from("predictions")
       .select("*")
       .eq("user_id", user.id)
       .eq("match_id", id)
       .maybeSingle();
+
     if (data) {
-      if (data.home_score !== null) setScoreA(data.home_score);
-      if (data.away_score !== null) setScoreB(data.away_score);
-      if (data.winner_pick) setWinner(data.winner_pick as "A" | "X" | "B");
-      if (data.goal_first_half !== null) setGoalFirstHalf(data.goal_first_half);
-      if (data.goal_second_half !== null) setGoalSecondHalf(data.goal_second_half);
-      if (data.has_red_card !== null) setRedCard(data.has_red_card);
-      if (data.has_penalty !== null) setPenalty(data.has_penalty);
-      if (data.first_to_score) setFirstGoal(data.first_to_score as "A" | "N" | "B");
-      if (data.possession_winner) setPossession(data.possession_winner as "A" | "B");
+      setScoreA(data.home_score       != null ? data.home_score       : "");
+      setScoreB(data.away_score       != null ? data.away_score       : "");
+      setWinner((data.winner_pick     as "A" | "X" | "B") ?? null);
+      setGoalFirstHalf( (data.goal_first_half  as boolean) ?? null);
+      setGoalSecondHalf((data.goal_second_half as boolean) ?? null);
+      setRedCard(       (data.has_red_card     as boolean) ?? null);
+      setPenalty(       (data.has_penalty      as boolean) ?? null);
+      setFirstGoal((data.first_to_score    as "A" | "N" | "B") ?? null);
+      setPossession((data.possession_winner as "A" | "B")      ?? null);
       setHasSavedPrediction(true);
+      // Servidor manda: sincroniza localStorage
+      if (localKey) {
+        try {
+          localStorage.setItem(localKey, JSON.stringify({
+            home_score: data.home_score, away_score: data.away_score,
+            winner_pick: data.winner_pick, goal_first_half: data.goal_first_half,
+            goal_second_half: data.goal_second_half, has_red_card: data.has_red_card,
+            has_penalty: data.has_penalty, first_to_score: data.first_to_score,
+            possession_winner: data.possession_winner,
+          }));
+        } catch { /* ignorar */ }
+      }
     }
     setLoadingPrediction(false);
-  };
+  }, [user, id, predictionLoaded, localKey]);
 
+  // Auto-fetch ao montar quando usuário estiver disponível
+  useEffect(() => {
+    if (user) fetchFromServer();
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Também carrega ao expandir (cobre o caso de user que fez login depois do mount)
   const handleToggleExpand = () => {
-    if (!expanded) loadExistingPrediction();
-    setExpanded(!expanded);
+    if (!expanded && !predictionLoaded) fetchFromServer();
+    setExpanded(e => !e);
   };
 
+  // ── Contagem de campos preenchidos ───────────────────────────────────────────
   const filledCount = [
     scoreA !== "" && scoreB !== "",
     winner !== null,
@@ -146,66 +234,82 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date, ha
     possession !== null,
   ].filter(Boolean).length;
 
+  // ── Rótulo do botão principal ────────────────────────────────────────────────
+  const buttonLabel = () => {
+    if (isLocked)          return <><Lock className="w-4 h-4" /> Apostas Encerradas</>;
+    if (saved)             return <><Check className="w-4 h-4" /> Palpite Salvo!</>;
+    if (hasSavedPrediction)return <><Zap className="w-4 h-4" /> Alterar Palpite</>;
+    return                        <><Zap className="w-4 h-4" /> Salvar Palpite</>;
+  };
+
+  const buttonClass = () => {
+    if (isLocked) return "bg-muted text-muted-foreground cursor-not-allowed opacity-60";
+    if (saved)    return "bg-secondary text-secondary-foreground";
+    return "btn-gold";
+  };
+
+  // ── Salvar ───────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!user) {
-      toast.error("Faça login para salvar palpites.");
-      navigate("/auth");
-      return;
-    }
-    // Gate: subscription ativa OU payment_confirmed OU tester
-    if (!isActive && !hasPaid) {
+    if (isLocked) return;
+    if (!user) { toast.error("Faça login para salvar palpites."); navigate("/auth"); return; }
+    if (paywallActive && !isActive && !hasPaid) {
       toast.error("Assine o plano para participar da Copa!", {
         action: { label: "Ver Planos", onClick: () => navigate("/planos") },
       });
       return;
     }
 
-    // Verifica horário do servidor (anti-fraude: ignora relógio local)
+    // Anti-fraude: valida horário no servidor
     if (date) {
       const { data: serverTime, error: timeErr } = await supabase.rpc("get_server_time");
       if (!timeErr && serverTime) {
-        const gameStart = parseMatchDateTime(date, time);
-        if (new Date(serverTime as string) >= gameStart) {
+        if (new Date(serverTime as string) >= parseMatchDateTime(date, time)) {
           toast.error("Prazo encerrado! Este jogo já começou.");
+          setIsLocked(true);
           return;
         }
       }
     }
 
-    const { error } = await supabase.from("predictions").upsert(
-      {
-        user_id: user.id,
-        match_id: id,
-        home_score: scoreA === "" ? null : (scoreA as number),
-        away_score: scoreB === "" ? null : (scoreB as number),
-        winner_pick: winner,
-        goal_first_half: goalFirstHalf,
-        goal_second_half: goalSecondHalf,
-        has_red_card: redCard,
-        has_penalty: penalty,
-        first_to_score: firstGoal,
-        possession_winner: possession,
-        points_earned: 0,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,match_id" }
-    );
+    const { error } = await supabase.from("predictions").upsert({
+      user_id: user.id, match_id: id,
+      home_score:       scoreA === "" ? null : (scoreA as number),
+      away_score:       scoreB === "" ? null : (scoreB as number),
+      winner_pick:      winner,
+      goal_first_half:  goalFirstHalf,
+      goal_second_half: goalSecondHalf,
+      has_red_card:     redCard,
+      has_penalty:      penalty,
+      first_to_score:   firstGoal,
+      possession_winner:possession,
+      points_earned:    0,
+      updated_at:       new Date().toISOString(),
+    }, { onConflict: "user_id,match_id" });
 
-    if (error) {
-      toast.error("Erro ao salvar palpite.");
-      return;
+    if (error) { toast.error("Erro ao salvar palpite."); return; }
+
+    // Persiste localmente após confirmação
+    if (localKey) {
+      try {
+        localStorage.setItem(localKey, JSON.stringify({
+          home_score: scoreA === "" ? null : scoreA, away_score: scoreB === "" ? null : scoreB,
+          winner_pick: winner, goal_first_half: goalFirstHalf, goal_second_half: goalSecondHalf,
+          has_red_card: redCard, has_penalty: penalty, first_to_score: firstGoal,
+          possession_winner: possession,
+        }));
+      } catch { /* ignorar */ }
     }
 
+    setHasSavedPrediction(true);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 3000); // 3s → volta para "Alterar Palpite"
   };
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <div className={`card-match rounded-xl overflow-hidden transition-all duration-300 ${expanded ? "ring-1 ring-primary/30" : ""}`}>
-      <button
-        onClick={handleToggleExpand}
-        className="w-full flex items-center justify-between p-4"
-      >
+      {/* Header */}
+      <button onClick={handleToggleExpand} className="w-full flex items-center justify-between p-4">
         <div className="flex items-center gap-3 flex-1">
           <div className="flex items-center gap-2 flex-1">
             <FlagImg teamName={teamA} className="h-6 rounded shadow-sm" />
@@ -222,97 +326,136 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date, ha
           </div>
         </div>
         <div className="flex items-center gap-2 ml-3">
-          {hasSavedPrediction && filledCount === 0 && (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-secondary/20 text-secondary">
-              ✓
-            </span>
+          {isLocked && <Lock className="w-3.5 h-3.5 text-muted-foreground" />}
+          {!isLocked && hasSavedPrediction && filledCount === 0 && (
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-secondary/20 text-secondary">✓</span>
           )}
           {filledCount > 0 && (
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
               filledCount === 8 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-            }`}>
-              {filledCount}/8
-            </span>
+            }`}>{filledCount}/8</span>
           )}
           {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
         </div>
       </button>
 
+      {/* Body */}
       {expanded && (
         <div className="px-4 pb-4 space-y-4 animate-slide-up">
           <div className="h-px bg-border" />
+
+          {isLocked && (
+            <div className="flex items-center justify-center gap-2 py-3 rounded-lg bg-muted/60 text-muted-foreground text-xs font-semibold">
+              <Lock className="w-4 h-4" /> Apostas encerradas — jogo começa em breve
+            </div>
+          )}
+
           {loadingPrediction && (
             <div className="flex items-center justify-center gap-2 py-4 text-muted-foreground text-xs">
               <Loader2 className="w-4 h-4 animate-spin" /> Carregando seu palpite...
             </div>
           )}
-          <div className={loadingPrediction ? "hidden" : ""}>
-          <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
-              Placar Exato <span className="text-primary">(25 pts)</span>
-            </label>
-            <div className="flex items-center justify-center gap-3">
-              <div className="flex items-center gap-2">
-                <FlagImg teamName={teamA} className="h-5 rounded shadow-sm" />
-                <input type="number" min={0} max={20} value={scoreA} onChange={(e) => setScoreA(e.target.value === "" ? "" : parseInt(e.target.value))} className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="0" />
+
+          <div className={loadingPrediction ? "hidden" : "space-y-4"}>
+            {/* Placar */}
+            <div>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+                Placar Exato <span className="text-primary">(25 pts)</span>
+              </label>
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-2">
+                  <FlagImg teamName={teamA} className="h-5 rounded shadow-sm" />
+                  <input
+                    type="number" min={0} max={20} placeholder="0"
+                    value={scoreA} disabled={isLocked}
+                    onChange={e => setScoreA(e.target.value === "" ? "" : parseInt(e.target.value))}
+                    className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  />
+                </div>
+                <span className="text-muted-foreground font-bold text-lg">×</span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number" min={0} max={20} placeholder="0"
+                    value={scoreB} disabled={isLocked}
+                    onChange={e => setScoreB(e.target.value === "" ? "" : parseInt(e.target.value))}
+                    className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  />
+                  <FlagImg teamName={teamB} className="h-5 rounded shadow-sm" />
+                </div>
               </div>
-              <span className="text-muted-foreground font-bold text-lg">×</span>
-              <div className="flex items-center gap-2">
-                <input type="number" min={0} max={20} value={scoreB} onChange={(e) => setScoreB(e.target.value === "" ? "" : parseInt(e.target.value))} className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" placeholder="0" />
-                <FlagImg teamName={teamB} className="h-5 rounded shadow-sm" />
+            </div>
+
+            {/* Vencedor */}
+            <div>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+                Vencedor / Empate <span className="text-primary">(10 pts)</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {([{ key: "A" as const, label: teamA }, { key: "X" as const, label: "Empate" }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
+                  <button
+                    key={key} disabled={isLocked}
+                    onClick={() => !isLocked && setWinner(winner === key ? null : key)}
+                    className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${winner === key ? "bg-primary text-primary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Toggles */}
+            <div className="grid grid-cols-2 gap-3">
+              <ToggleField label="Gol no 1º Tempo"  pointsSim={5}  pointsNao={5}  value={goalFirstHalf}  onChange={setGoalFirstHalf}  disabled={isLocked} />
+              <ToggleField label="Gol no 2º Tempo"  pointsSim={5}  pointsNao={5}  value={goalSecondHalf} onChange={setGoalSecondHalf} disabled={isLocked} />
+              <ToggleField label="Terá Expulsão?"   pointsSim={12} pointsNao={5}  value={redCard}        onChange={setRedCard}        disabled={isLocked} />
+              <ToggleField label="Terá Pênalti?"    pointsSim={7}  pointsNao={7}  value={penalty}        onChange={setPenalty}        disabled={isLocked} />
+            </div>
+
+            {/* 1º a marcar */}
+            <div>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+                Quem marca 1º? <span className="text-primary">(8 pts)</span>
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {([{ key: "A" as const, label: teamA }, { key: "N" as const, label: "Ninguém" }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
+                  <button
+                    key={key} disabled={isLocked}
+                    onClick={() => !isLocked && setFirstGoal(firstGoal === key ? null : key)}
+                    className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${firstGoal === key ? "bg-secondary text-secondary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >{label}</button>
+                ))}
+              </div>
+            </div>
+
+            {/* Posse */}
+            <div>
+              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+                Mais Posse de Bola <span className="text-primary">(5 pts)</span>
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {([{ key: "A" as const, label: teamA }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
+                  <button
+                    key={key} disabled={isLocked}
+                    onClick={() => !isLocked && setPossession(possession === key ? null : key)}
+                    className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${possession === key ? "bg-secondary text-secondary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}
+                  >{label}</button>
+                ))}
               </div>
             </div>
           </div>
 
-          <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
-              Vencedor / Empate <span className="text-primary">(10 pts)</span>
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {([{ key: "A" as const, label: teamA }, { key: "X" as const, label: "Empate" }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
-                <button key={key} onClick={() => setWinner(winner === key ? null : key)} className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${winner === key ? "bg-primary text-primary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{label}</button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <ToggleField label="Gol no 1º Tempo" points={5} value={goalFirstHalf} onChange={setGoalFirstHalf} />
-            <ToggleField label="Gol no 2º Tempo" points={5} value={goalSecondHalf} onChange={setGoalSecondHalf} />
-            <ToggleField label="Terá Expulsão?" points={7} value={redCard} onChange={setRedCard} />
-            <ToggleField label="Terá Pênalti?" points={7} value={penalty} onChange={setPenalty} />
-          </div>
-
-          <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
-              Quem marca 1º? <span className="text-primary">(8 pts)</span>
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              {([{ key: "A" as const, label: teamA }, { key: "N" as const, label: "Ninguém" }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
-                <button key={key} onClick={() => setFirstGoal(firstGoal === key ? null : key)} className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${firstGoal === key ? "bg-secondary text-secondary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{label}</button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
-              Mais Posse de Bola <span className="text-primary">(5 pts)</span>
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {([{ key: "A" as const, label: teamA }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
-                <button key={key} onClick={() => setPossession(possession === key ? null : key)} className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all ${possession === key ? "bg-secondary text-secondary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}>{label}</button>
-              ))}
-            </div>
-          </div>
-
-          </div>
-          <button onClick={handleSave} className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${saved ? "bg-secondary text-secondary-foreground" : "btn-gold"}`}>
-            {saved ? (<><Check className="w-4 h-4" /> Palpite Salvo!</>) : (<><Zap className="w-4 h-4" /> Salvar Palpite</>)}
+          {/* Botão salvar */}
+          <button
+            onClick={handleSave}
+            disabled={isLocked}
+            className={`w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${buttonClass()}`}
+          >
+            {buttonLabel()}
           </button>
 
-          {filledCount === 8 && (
+          {/* Potencial máximo */}
+          {filledCount === 8 && !isLocked && (
             <div className="text-center text-xs text-primary font-semibold animate-pulse-gold p-2 rounded-lg bg-glass-gold">
-              🏆 Todos os 8 palpites preenchidos — Potencial máximo: {82 * multiplier} pts
-              {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier})</span>}
+              🏆 Palpite completo — Potencial: até {MAX_BASE_POINTS * multiplier} pts
+              {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier} fase)</span>}
             </div>
           )}
         </div>
@@ -320,24 +463,5 @@ const MatchCard = ({ id, teamA, teamB, time, group, matchNumber, stage, date, ha
     </div>
   );
 };
-
-interface ToggleFieldProps {
-  label: string;
-  points: number;
-  value: boolean | null;
-  onChange: (v: boolean | null) => void;
-}
-
-const ToggleField = ({ label, points, value, onChange }: ToggleFieldProps) => (
-  <div className="bg-muted/50 rounded-lg p-3">
-    <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
-      {label} <span className="text-primary">({points} pts)</span>
-    </label>
-    <div className="flex gap-2">
-      <button onClick={() => onChange(value === true ? null : true)} className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${value === true ? "bg-secondary text-secondary-foreground" : "bg-muted text-muted-foreground"}`}>Sim</button>
-      <button onClick={() => onChange(value === false ? null : false)} className={`flex-1 py-2 rounded-md text-xs font-bold transition-all ${value === false ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"}`}>Não</button>
-    </div>
-  </div>
-);
 
 export default MatchCard;

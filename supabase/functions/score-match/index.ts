@@ -2,19 +2,30 @@
  * score-match — calcula e distribui pontos de um jogo
  *
  * Segurança: requer autenticação de admin (mesmo padrão de admin-confirm-payment).
- * Sem este check, qualquer pessoa podia forjar resultados e distribuir pontos.
+ *
+ * SCORING — SYNC com src/lib/scoring.ts calculateMatchPoints (duplicado por incompatibilidade Deno/Vite)
+ *
+ * Placar exato:              25 pts
+ * Vencedor/empate:           10 pts (separado; não se aplica se saldo ganhou)
+ * Saldo de gols:             15 pts — substitui vencedor: placar errado + vencedor certo + |diff| igual
+ * Gol 1º / 2º tempo:        5 pts cada
+ * Expulsão — Sim certo:     12 pts | Não certo: 5 pts
+ * Pênalti:                   7 pts
+ * 1º a marcar:               8 pts
+ * Posse de bola:             5 pts
+ * Gabarito perfeito (8/8):  100 pts base, depois × multiplicador de fase
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": Deno.env.get("SITE_URL") || "*", // "*" only in dev; set SITE_URL in prod
+  "Access-Control-Allow-Origin": Deno.env.get("SITE_URL") || "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-
 const MULTIPLIERS: Record<string, number> = {
   "Group Stage": 1, "Grupos": 1, "Brasileirão": 1,
+  "32avos": 2,
   "Round of 16": 2, "Oitavas": 2,
   "Quarter-finals": 3, "Quartas": 3,
   "Semi-finals": 4, "Semis": 4,
@@ -24,6 +35,78 @@ const MULTIPLIERS: Record<string, number> = {
 function getMultiplier(stage: string): number {
   return MULTIPLIERS[stage] ?? 1;
 }
+
+// ── SYNC com src/lib/scoring.ts ───────────────────────────────────────────────
+interface Pred {
+  home_score:        number | null;
+  away_score:        number | null;
+  winner_pick:       string | null;
+  goal_first_half:   boolean | null;
+  goal_second_half:  boolean | null;
+  has_red_card:      boolean | null;
+  has_penalty:       boolean | null;
+  first_to_score:    string | null;
+  possession_winner: string | null;
+}
+
+interface Res {
+  home:           number;
+  away:           number;
+  winner:         string;
+  goalFirstHalf:  boolean;
+  goalSecondHalf: boolean;
+  redCard:        boolean;
+  penalty:        boolean;
+  firstToScore:   string;
+  possession:     string;
+}
+
+function calculateMatchPoints(p: Pred, r: Res): number {
+  // Gabarito perfeito (8/8) → 100 pts base
+  const isPerfect =
+    p.home_score       === r.home          &&
+    p.away_score       === r.away          &&
+    p.winner_pick      === r.winner        &&
+    p.goal_first_half  === r.goalFirstHalf &&
+    p.goal_second_half === r.goalSecondHalf&&
+    p.has_red_card     === r.redCard       &&
+    p.has_penalty      === r.penalty       &&
+    p.first_to_score   === r.firstToScore  &&
+    p.possession_winner=== r.possession;
+
+  if (isPerfect) return 100;
+
+  let pts = 0;
+
+  const exactScore = p.home_score === r.home && p.away_score === r.away;
+  if (exactScore) {
+    pts += 25;
+    if (p.winner_pick === r.winner) pts += 10;
+  } else {
+    const correctWinner = p.winner_pick != null && p.winner_pick === r.winner;
+    const correctDiff =
+      p.home_score !== null &&
+      p.away_score !== null &&
+      Math.abs(p.home_score - p.away_score) === Math.abs(r.home - r.away);
+    if (correctWinner && correctDiff) {
+      pts += 15; // saldo: substitui winner (não acumula +10 separado)
+    } else if (correctWinner) {
+      pts += 10;
+    }
+  }
+
+  if (p.goal_first_half  !== null && p.goal_first_half  === r.goalFirstHalf)  pts += 5;
+  if (p.goal_second_half !== null && p.goal_second_half === r.goalSecondHalf) pts += 5;
+  if (p.has_red_card !== null && p.has_red_card === r.redCard) {
+    pts += p.has_red_card ? 12 : 5; // Sim certo=12, Não certo=5
+  }
+  if (p.has_penalty  !== null && p.has_penalty  === r.penalty)      pts += 7;
+  if (p.first_to_score  != null && p.first_to_score  === r.firstToScore)  pts += 8;
+  if (p.possession_winner != null && p.possession_winner === r.possession) pts += 5;
+
+  return pts;
+}
+// ── FIM SYNC ──────────────────────────────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -58,7 +141,6 @@ serve(async (req) => {
 
     const { match_id, result } = await req.json();
 
-    // Salva resultado no jogo
     const { data: match, error: matchErr } = await supabase
       .from("matches")
       .update({
@@ -93,17 +175,8 @@ serve(async (req) => {
     }
 
     for (const p of predictions) {
-      let pts = 0;
-      if (p.home_score === result.home && p.away_score === result.away) pts += 25;
-      if (p.winner_pick && p.winner_pick === result.winner)             pts += 10;
-      if (p.goal_first_half  !== null && p.goal_first_half  === result.goalFirstHalf)  pts += 5;
-      if (p.goal_second_half !== null && p.goal_second_half === result.goalSecondHalf) pts += 5;
-      if (p.has_red_card     !== null && p.has_red_card     === result.redCard)        pts += 7;
-      if (p.has_penalty      !== null && p.has_penalty      === result.penalty)        pts += 7;
-      if (p.first_to_score && p.first_to_score === result.firstToScore)               pts += 8;
-      if (p.possession_winner && p.possession_winner === result.possession)            pts += 5;
-
-      const total = pts * multiplier;
+      const base = calculateMatchPoints(p as Pred, result as Res);
+      const total = base * multiplier;
 
       await supabase
         .from("predictions")
@@ -120,7 +193,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

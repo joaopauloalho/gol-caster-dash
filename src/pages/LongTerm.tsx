@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useParticipant } from "@/hooks/useParticipant";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -64,6 +65,8 @@ const LongTerm = () => {
   const { user } = useAuth();
   const { hasPaid } = useParticipant();
   const { isActive } = useSubscription();
+  const { settings } = useSiteSettings();
+  const paywallActive = settings.feature_flags?.paywall_active ?? true;
   const navigate = useNavigate();
   const [champion, setChampion] = useState("");
   const [finalist1, setFinalist1] = useState("");
@@ -168,8 +171,8 @@ const LongTerm = () => {
               navigate("/auth");
               return;
             }
-            // Gate: mesmo critério de MatchCard (subscription ativa | pago | tester)
-            if (!isActive && !hasPaid) {
+            // Gate: mesmo critério de MatchCard (subscription ativa | pago | tester | paywall off)
+            if (paywallActive && !isActive && !hasPaid) {
               toast.error("Assine o plano para salvar previsões!", {
                 action: { label: "Ver Planos", onClick: () => navigate("/planos") },
               });
