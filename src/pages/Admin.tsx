@@ -225,9 +225,26 @@ const Admin = () => {
     if (!r || r.home === "" || r.away === "") { toast.error("Preencha placar e vencedor"); return; }
     setScoringMatch(matchId);
     try {
-      const data = await callEdge("score-match", {
-        match_id: matchId, result: { ...r, home: Number(r.home), away: Number(r.away) },
+      const session = await getSession();
+      if (!session) throw new Error("Sessão inválida");
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/score-match`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ match_id: matchId, result: { ...r, home: Number(r.home), away: Number(r.away) } }),
       });
+      if (res.status === 409) {
+        toast.warning("Esta partida já foi pontuada anteriormente.");
+        setMatches(prev => prev.map(m => m.id === matchId ? { ...m, scored: true } : m));
+        setExpandedMatch(null);
+        setScoringMatch(null);
+        return;
+      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erro desconhecido");
       toast.success(`${data.scored} palpites pontuados!`);
       setMatches(prev => prev.map(m => m.id === matchId ? { ...m, scored: true, result_home: Number(r.home), result_away: Number(r.away) } : m));
       setExpandedMatch(null);

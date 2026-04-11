@@ -58,6 +58,37 @@ serve(async (req) => {
       });
     }
 
+    // ── Validação de deadline de palpite (somente quando match_id for enviado) ──
+    if (body.match_id) {
+      const { data: matchData, error: matchCheckErr } = await supabase
+        .from("matches")
+        .select("starts_at, scored")
+        .eq("id", body.match_id)
+        .single();
+
+      if (matchCheckErr) {
+        return new Response(
+          JSON.stringify({ error: "Partida não encontrada" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (matchData.scored) {
+        return new Response(
+          JSON.stringify({ error: "Esta partida já foi encerrada e pontuada." }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (matchData.starts_at && new Date(matchData.starts_at) <= new Date()) {
+        return new Response(
+          JSON.stringify({ error: "O prazo para palpites nesta partida já encerrou." }),
+          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+    // ── Fim validação de deadline ─────────────────────────────────────────────
+
     // payment_confirmed e bonus_points NUNCA vêm do cliente
     const { error } = await supabase.from("participants").insert({
       id:                userId,

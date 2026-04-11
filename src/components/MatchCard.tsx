@@ -49,8 +49,13 @@ function getLocalTime(date: string | undefined, time: string): string {
   } catch { return time; }
 }
 
-/** Retorna true se faltam ≤30 min para o início (ou jogo já começou) */
-function checkLocked(date: string | undefined, time: string): boolean {
+/** Retorna true se faltam ≤30 min para o início, jogo já começou, ou partida já foi pontuada */
+function checkLocked(date: string | undefined, time: string, startsAt?: string | null, scored?: boolean): boolean {
+  if (scored) return true;
+  // Usa starts_at (UTC ISO) diretamente quando disponível
+  if (startsAt) {
+    return Date.now() >= new Date(startsAt).getTime() - 30 * 60 * 1000;
+  }
   if (!date) return false;
   try {
     const start = parseMatchDateTime(date, time);
@@ -112,11 +117,13 @@ interface MatchCardProps {
   date?: string;
   stage?: string;
   hasPaid?: boolean;
+  scored?: boolean;
+  startsAt?: string | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false }: MatchCardProps) => {
+const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false, scored, startsAt }: MatchCardProps) => {
   const multiplier  = getPhaseMultiplier(stage ?? "Group Stage");
   const localTime   = getLocalTime(date, time);
   const { user }    = useAuth();
@@ -140,16 +147,16 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
   const [possession,         setPossession]         = useState<"A" | "B" | null>(null);
   const [hasSavedPrediction, setHasSavedPrediction] = useState(false);
   const [saved,              setSaved]              = useState(false);
-  const [isLocked,           setIsLocked]           = useState(() => checkLocked(date, time));
+  const [isLocked,           setIsLocked]           = useState(() => checkLocked(date, time, startsAt, scored));
 
   const localKey = user ? `prediction:${user.id}:${id}` : null;
 
   // ── Deadline lock — verifica a cada 30s ─────────────────────────────────────
   useEffect(() => {
-    setIsLocked(checkLocked(date, time));
-    const t = setInterval(() => setIsLocked(checkLocked(date, time)), 30_000);
+    setIsLocked(checkLocked(date, time, startsAt, scored));
+    const t = setInterval(() => setIsLocked(checkLocked(date, time, startsAt, scored)), 30_000);
     return () => clearInterval(t);
-  }, [date, time]);
+  }, [date, time, startsAt, scored]);
 
   // ── Hydration 1: localStorage (síncrono, sem flicker) ───────────────────────
   useEffect(() => {
@@ -346,7 +353,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
 
           {isLocked && (
             <div className="flex items-center justify-center gap-2 py-3 rounded-lg bg-muted/60 text-muted-foreground text-xs font-semibold">
-              <Lock className="w-4 h-4" /> Apostas encerradas — jogo começa em breve
+              <Lock className="w-4 h-4" /> {scored ? "Partida encerrada" : "Apostas encerradas — jogo começa em breve"}
             </div>
           )}
 

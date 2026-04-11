@@ -12,6 +12,8 @@ export interface MatchData {
   teamB: string;
   flagA: string;
   flagB: string;
+  scored?: boolean;
+  startsAt?: string | null;
 }
 
 export type PhaseKey = "Brasileirão" | "Grupos" | "32avos" | "Oitavas" | "Quartas" | "Semis" | "Final";
@@ -99,5 +101,7 @@ export async function fetchMatchesByPhase(phase: PhaseKey): Promise<MatchData[]>
     teamB: row.team_b,
     flagA: row.flag_a,
     flagB: row.flag_b,
+    scored: row.scored ?? false,
+    startsAt: row.starts_at ?? null,
   }));
 }

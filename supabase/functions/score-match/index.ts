@@ -141,6 +141,22 @@ serve(async (req) => {
 
     const { match_id, result } = await req.json();
 
+    // ── Guard de idempotência: aborta se partida já foi pontuada ───────────────
+    const { data: existingMatch, error: checkErr } = await supabase
+      .from("matches")
+      .select("id, scored")
+      .eq("id", match_id)
+      .single();
+
+    if (checkErr) throw new Error(checkErr.message);
+    if (existingMatch?.scored === true) {
+      return new Response(
+        JSON.stringify({ error: "Partida já foi pontuada anteriormente.", alreadyScored: true }),
+        { status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    // ── Fim guard ─────────────────────────────────────────────────────────────
+
     const { data: match, error: matchErr } = await supabase
       .from("matches")
       .update({

@@ -32,6 +32,17 @@ function formatTime(date: Date): string {
   return `${h}:${min}`;
 }
 
+// Converte date "DD/MM/YYYY" + time "HH:MM" (BRT) para ISO UTC
+function toStartsAt(dateStr: string, timeStr: string): string | null {
+  try {
+    const [day, month, year] = dateStr.split("/");
+    const localDate = new Date(`${year}-${month}-${day}T${timeStr}:00-03:00`);
+    return localDate.toISOString();
+  } catch {
+    return null;
+  }
+}
+
 // "20260411" → data formatada p/ query ESPN
 function toESPNDate(d: Date): string {
   const y = d.getUTCFullYear();
@@ -112,6 +123,9 @@ serve(async (req) => {
           const startDate = new Date(event.date);
           const matchNumber = parseInt(event.id.slice(-5)); // ex: 41068
 
+          const formattedDate = formatDate(startDate);
+          const formattedTime = formatTime(startDate);
+
           const row = {
             espn_id:      String(event.id),
             match_number: matchNumber,
@@ -119,8 +133,9 @@ serve(async (req) => {
             team_b:       away.team.displayName,
             flag_a:       home.team.logo ?? "",
             flag_b:       away.team.logo ?? "",
-            date:         formatDate(startDate),
-            time:         formatTime(startDate),
+            date:         formattedDate,
+            time:         formattedTime,
+            starts_at:    toStartsAt(formattedDate, formattedTime),
             city:         competition.venue?.address?.city ?? "",
             stage:        "Brasileirão",
             group_name:   roundLabel,
