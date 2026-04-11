@@ -16,9 +16,23 @@
  */
 
 const https = require('https');
+const url = require('url');
 
-const SUPABASE_URL = 'https://mmeiehwqgyhnsriqazcw.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_publishable_FhdZwPm1cTAf6eJ_U2SxKw_sbE3QKBV';
+// Variáveis obrigatórias — nunca hardcode no código
+// SUPABASE_URL=https://<project>.supabase.co
+// SUPABASE_ANON_KEY=sb_publishable_...  (anon key; cabeçalho apikey)
+// SUPABASE_ADMIN_JWT=eyJ...             (JWT de sessão de um usuário com role=admin)
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
+const ADMIN_JWT    = process.env.SUPABASE_ADMIN_JWT || '';
+
+if (!SUPABASE_URL || !SUPABASE_KEY || !ADMIN_JWT) {
+  console.error('❌ Defina SUPABASE_URL, SUPABASE_ANON_KEY e SUPABASE_ADMIN_JWT antes de rodar.');
+  console.error('   Exemplo: SUPABASE_URL=https://xxx.supabase.co SUPABASE_ANON_KEY=sb_publishable_... SUPABASE_ADMIN_JWT=eyJ... node scripts/create-tester.cjs nome');
+  process.exit(1);
+}
+
+const { hostname } = new url.URL(SUPABASE_URL);
 
 const usernames = process.argv.slice(2);
 
@@ -26,12 +40,12 @@ function callEdgeFunction(body) {
   return new Promise((resolve, reject) => {
     const bodyStr = JSON.stringify(body);
     const options = {
-      hostname: 'mmeiehwqgyhnsriqazcw.supabase.co',
+      hostname,
       path: '/functions/v1/setup-test-user',
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Authorization': `Bearer ${ADMIN_JWT}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(bodyStr),
       },

@@ -13,11 +13,24 @@
  */
 
 const https = require('https');
+const url = require('url');
 
-const SUPABASE_URL = 'https://mmeiehwqgyhnsriqazcw.supabase.co';
-// Prefere service role key (inserção sem restrição RLS); fallback para publishable
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_publishable_FhdZwPm1cTAf6eJ_U2SxKw_sbE3QKBV';
-const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY || '';
+// Variáveis obrigatórias — nunca hardcode no código
+// SUPABASE_URL=https://<project>.supabase.co
+// SUPABASE_ANON_KEY=sb_publishable_...  (anon key; cabeçalho apikey)
+// SUPABASE_ADMIN_JWT=eyJ...             (JWT de sessão de um usuário com role=admin)
+// API_FOOTBALL_KEY=...                  (opcional; busca jogos reais da API)
+const SUPABASE_URL     = process.env.SUPABASE_URL     || '';
+const SUPABASE_KEY     = process.env.SUPABASE_ANON_KEY || '';
+const ADMIN_JWT        = process.env.SUPABASE_ADMIN_JWT || '';
+const API_FOOTBALL_KEY = process.env.API_FOOTBALL_KEY  || '';
+
+if (!SUPABASE_URL || !SUPABASE_KEY || !ADMIN_JWT) {
+  console.error('❌ Defina SUPABASE_URL, SUPABASE_ANON_KEY e SUPABASE_ADMIN_JWT antes de rodar.');
+  process.exit(1);
+}
+
+const { hostname } = new url.URL(SUPABASE_URL);
 
 // ── Jogos estáticos para testes ───────────────────────────────────────────────
 // 5 rodadas × 5 jogos = 25 partidas
@@ -120,12 +133,12 @@ function callSeedFunction(clearFirst = false) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({ clear_first: clearFirst });
     const options = {
-      hostname: 'mmeiehwqgyhnsriqazcw.supabase.co',
+      hostname,
       path: '/functions/v1/seed-brasileirao',
       method: 'POST',
       headers: {
         'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Authorization': `Bearer ${ADMIN_JWT}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
       },
