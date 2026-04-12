@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import {
   Trophy, Zap, ChevronRight, Users, Gift,
   Lock, Crown, Target, Eye, MapPin, Map, Globe, Swords, Star, Shield,
@@ -8,10 +8,12 @@ import { RetroGrid } from "@/components/ui/retro-grid";
 import { Marquee } from "@/components/ui/marquee";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { NumberTicker } from "@/components/ui/number-ticker";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import OnboardingWizard from "@/components/OnboardingWizard";
+import { ReadingProgress } from "@/components/ReadingProgress";
+
+const OnboardingWizard = lazy(() => import("@/components/OnboardingWizard"));
 
 // ─── Animation helper ─────────────────────────────────────────────────────────
 
@@ -19,17 +21,20 @@ const FadeUp = ({
   children, delay = 0, className = "",
 }: {
   children: React.ReactNode; delay?: number; className?: string;
-}) => (
-  <motion.div
-    initial={{ opacity: 0, y: 40 }}
-    whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true, margin: "-60px" }}
-    transition={{ delay: delay * 0.12, duration: 0.55, ease: "easeOut" }}
-    className={className}
-  >
-    {children}
-  </motion.div>
-);
+}) => {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: reduce ? 0 : 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-60px" }}
+      transition={{ delay: reduce ? 0 : delay * 0.12, duration: reduce ? 0.01 : 0.55, ease: "easeOut" }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+};
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -43,7 +48,7 @@ const activityFeed = [
   "🔥 @luana acaba de indicar o 10º amigo — JBL a caminho!",
   "📈 @pedro_alves subiu 47 posições no ranking geral hoje!",
   "🎯 @carol_lima acertou Vencedor + Placar Exato no Portugal x França!",
-  "💰 @rafa ganhou R$ 180 pela rodada — Gabarito Supremo!",
+  "💰 @rafa ganhou R$ 180 pela rodada — Gabarito Perfeito!",
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -53,6 +58,7 @@ const Landing = () => {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const referralCode = searchParams.get("ref") || "";
+  const reduce = useReducedMotion();
 
   // Captura ?group= e persiste no localStorage para sobreviver ao redirect do MP
   const groupCode = searchParams.get("group") || "";
@@ -67,15 +73,18 @@ const Landing = () => {
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
+      <ReadingProgress />
 
       {/* ── Onboarding Wizard Overlay ────────────────────────── */}
       <AnimatePresence>
         {showWizard && (
-          <OnboardingWizard
-            referralCode={referralCode}
-            groupInviteCode={groupCode || localStorage.getItem("pending_group_code") || ""}
-            onClose={() => setShowWizard(false)}
-          />
+          <Suspense fallback={null}>
+            <OnboardingWizard
+              referralCode={referralCode}
+              groupInviteCode={groupCode || localStorage.getItem("pending_group_code") || ""}
+              onClose={() => setShowWizard(false)}
+            />
+          </Suspense>
         )}
       </AnimatePresence>
 
@@ -83,6 +92,7 @@ const Landing = () => {
           HERO — "O Convite para a Elite"
       ════════════════════════════════════════════════════════ */}
       <section
+        id="hero"
         className="relative overflow-hidden min-h-screen flex flex-col items-center justify-center px-4 py-24"
         style={{ background: "var(--gradient-hero)" }}
       >
@@ -94,9 +104,9 @@ const Landing = () => {
         <div className="relative z-10 max-w-lg mx-auto text-center space-y-7">
           {/* Badge */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.85 }}
+            initial={{ opacity: 0, scale: reduce ? 1 : 0.85 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.45 }}
+            transition={{ duration: reduce ? 0.01 : 0.45 }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full border text-xs font-bold"
             style={{ background: "rgba(234,179,8,0.12)", borderColor: "rgba(234,179,8,0.35)", color: "#FFD700" }}
           >
@@ -105,9 +115,9 @@ const Landing = () => {
 
           {/* Prize ticker */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: reduce ? 0 : 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.6 }}
+            transition={{ delay: reduce ? 0 : 0.1, duration: reduce ? 0.01 : 0.6 }}
             className="space-y-1"
           >
             <div className="text-sm font-bold uppercase tracking-widest text-muted-foreground">
@@ -115,15 +125,15 @@ const Landing = () => {
             </div>
             <div className="flex items-baseline justify-center gap-2">
               <span className="text-4xl font-black" style={{ color: "#FFD700" }}>R$</span>
-              <NumberTicker value={5000000} className="text-5xl md:text-7xl font-black" style={{ color: "#FFD700" } as any} />
+              <NumberTicker value={5000000} className="text-5xl md:text-7xl font-black" style={{ color: "#FFD700" } as React.CSSProperties} />
             </div>
           </motion.div>
 
           {/* Headline */}
           <motion.h1
-            initial={{ opacity: 0, y: 24 }}
+            initial={{ opacity: 0, y: reduce ? 0 : 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.6 }}
+            transition={{ delay: reduce ? 0 : 0.2, duration: reduce ? 0.01 : 0.6 }}
             className="text-3xl md:text-5xl font-black leading-[1.08] text-foreground"
           >
             O Super Bolão vai distribuir{" "}
@@ -136,7 +146,7 @@ const Landing = () => {
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.35 }}
+            transition={{ delay: reduce ? 0 : 0.35 }}
             className="text-muted-foreground text-sm md:text-base max-w-sm mx-auto leading-relaxed"
           >
             Centenas de chances de ganhar. Todo jogo vale prêmio, toda rodada vale Pix,{" "}
@@ -145,9 +155,9 @@ const Landing = () => {
 
           {/* CTA */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: reduce ? 0 : 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
+            transition={{ delay: reduce ? 0 : 0.5 }}
             className="flex flex-col gap-3 max-w-xs mx-auto"
           >
             <ShinyButton onClick={openWizard} className="py-5 text-[15px] tracking-wide">
@@ -165,7 +175,7 @@ const Landing = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
+            transition={{ delay: reduce ? 0 : 0.7 }}
             className="flex items-center justify-center gap-5 text-xs text-muted-foreground pt-2"
           >
             <span className="flex items-center gap-1.5"><Lock className="w-3 h-3" /> Pagamento seguro</span>
@@ -180,7 +190,7 @@ const Landing = () => {
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
+          transition={{ delay: reduce ? 0 : 1.2 }}
           className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 text-muted-foreground"
         >
           <div className="w-px h-8 bg-gradient-to-b from-border to-transparent" />
@@ -191,8 +201,8 @@ const Landing = () => {
       {/* ════════════════════════════════════════════════════════
           ACTIVITY MARQUEE #1
       ════════════════════════════════════════════════════════ */}
-      <div className="overflow-hidden border-y border-border/40 bg-black/40 py-1">
-        <Marquee pauseOnHover className="[--duration:45s]" repeat={3}>
+      <div className="overflow-hidden border-y border-border/40 bg-black/40 py-1" aria-hidden="true">
+        <Marquee pauseOnHover className="[--duration:45s]" repeat={2}>
           {activityFeed.map((msg) => (
             <div key={msg} className="flex items-center gap-2 bg-card/50 border border-border/50 rounded-lg px-4 py-2 mx-2 whitespace-nowrap">
               <span className="text-xs text-foreground">{msg}</span>
@@ -204,7 +214,7 @@ const Landing = () => {
       {/* ════════════════════════════════════════════════════════
           O CICLO DA VITÓRIA — 3 passos
       ════════════════════════════════════════════════════════ */}
-      <section className="px-4 py-20 max-w-lg mx-auto">
+      <section id="como-funciona" className="px-4 py-20 max-w-lg mx-auto">
         <FadeUp className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold mb-4"
             style={{ background: "rgba(234,179,8,0.1)", borderColor: "rgba(234,179,8,0.25)", color: "#FFD700" }}>
@@ -240,7 +250,7 @@ const Landing = () => {
       {/* ════════════════════════════════════════════════════════
           AS 3 FORMAS DE DOMINAR
       ════════════════════════════════════════════════════════ */}
-      <section className="px-4 pb-20 max-w-lg mx-auto">
+      <section id="pontuacao" className="px-4 pb-20 max-w-lg mx-auto">
         <FadeUp className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold mb-4"
             style={{ background: "rgba(234,179,8,0.1)", borderColor: "rgba(234,179,8,0.25)", color: "#FFD700" }}>
@@ -255,8 +265,8 @@ const Landing = () => {
             {
               emoji: "🎯", title: "Mestres do Placar", tag: "Curto Prazo",
               tagColor: "text-green-400", tagBg: "bg-green-400/10 border-green-400/20",
-              desc: "Pontue por placar exato e vencedor em cada jogo. 82 pontos por acerto perfeito, multiplicados pela fase.",
-              highlight: "82 pts por placar exato", border: "border-green-400/20", glow: "from-green-500/5", delay: 0,
+              desc: "Pontue por placar exato (25 pts), vencedor correto (10 pts) e campos extras do jogo. Gabarito perfeito (acerta tudo): 100 pts base, multiplicados pela fase.",
+              highlight: "100 pts base por gabarito perfeito", border: "border-green-400/20", glow: "from-green-500/5", delay: 0,
             },
             {
               emoji: "🦅", title: "Visão de Águia", tag: "Longo Prazo",
@@ -296,7 +306,7 @@ const Landing = () => {
       {/* ════════════════════════════════════════════════════════
           RANKINGS — Competição Local e Global
       ════════════════════════════════════════════════════════ */}
-      <section className="px-4 py-20" style={{ background: "linear-gradient(180deg, transparent 0%, rgba(234,179,8,0.04) 50%, transparent 100%)" }}>
+      <section id="rankings" className="px-4 py-20" style={{ background: "linear-gradient(180deg, transparent 0%, rgba(234,179,8,0.04) 50%, transparent 100%)" }}>
         <div className="max-w-lg mx-auto">
           <FadeUp className="text-center mb-10">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold mb-4"
@@ -332,7 +342,7 @@ const Landing = () => {
       {/* ════════════════════════════════════════════════════════
           SOCIAL & GRUPOS
       ════════════════════════════════════════════════════════ */}
-      <section className="px-4 py-20 max-w-lg mx-auto">
+      <section id="grupos" className="px-4 py-20 max-w-lg mx-auto">
         <FadeUp>
           <div className="rounded-3xl border border-border/60 bg-card/30 overflow-hidden">
             <div className="px-6 py-4 border-b border-border/40 flex items-center gap-3" style={{ background: "rgba(234,179,8,0.06)" }}>
@@ -343,7 +353,7 @@ const Landing = () => {
                 <div className="font-black text-sm text-foreground">Social & Grupos</div>
                 <div className="text-xs text-muted-foreground">Crie sua própria Arena</div>
               </div>
-              <div className="ml-auto flex gap-1.5">
+              <div className="ml-auto flex gap-1.5" aria-hidden="true">
                 <div className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
                 <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
                 <div className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
@@ -387,12 +397,12 @@ const Landing = () => {
       {/* ════════════════════════════════════════════════════════
           BANNER VIRAL — JBL
       ════════════════════════════════════════════════════════ */}
-      <section className="px-4 pb-20 max-w-lg mx-auto">
+      <section id="recompensas" className="px-4 pb-20 max-w-lg mx-auto">
         <FadeUp>
           <div className="relative overflow-hidden rounded-3xl border p-8 text-center"
             style={{ background: "linear-gradient(135deg, rgba(234,179,8,0.15) 0%, rgba(234,179,8,0.05) 60%, rgba(0,0,0,0.2) 100%)", borderColor: "rgba(234,179,8,0.4)" }}>
             <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-64 h-64 rounded-full blur-[80px] pointer-events-none"
-              style={{ background: "rgba(234,179,8,0.2)" }} />
+              style={{ background: "rgba(234,179,8,0.2)" }} aria-hidden="true" />
             <div className="relative z-10 space-y-4">
               <div className="text-5xl mb-2">🎧</div>
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-bold"
@@ -423,8 +433,8 @@ const Landing = () => {
       {/* ════════════════════════════════════════════════════════
           ACTIVITY MARQUEE #2 — reverso
       ════════════════════════════════════════════════════════ */}
-      <div className="overflow-hidden border-y border-border/30 bg-black/30 py-1 mb-0">
-        <Marquee reverse pauseOnHover className="[--duration:50s]" repeat={3}>
+      <div className="overflow-hidden border-y border-border/30 bg-black/30 py-1 mb-0" aria-hidden="true">
+        <Marquee reverse pauseOnHover className="[--duration:50s]" repeat={2}>
           {[...activityFeed].reverse().map((msg) => (
             <div key={msg} className="flex items-center gap-2 bg-card/40 border border-border/40 rounded-lg px-4 py-2 mx-2 whitespace-nowrap">
               <span className="text-xs text-foreground">{msg}</span>
@@ -436,7 +446,7 @@ const Landing = () => {
       {/* ════════════════════════════════════════════════════════
           FINAL CTA
       ════════════════════════════════════════════════════════ */}
-      <section className="px-4 py-20 max-w-lg mx-auto text-center">
+      <section id="cta-final" className="px-4 py-20 max-w-lg mx-auto text-center">
         <FadeUp className="space-y-5">
           <div className="text-4xl">⚽</div>
           <h2 className="text-2xl md:text-3xl font-black text-foreground">
@@ -458,6 +468,30 @@ const Landing = () => {
           </p>
         </FadeUp>
       </section>
+
+      {/* ════════════════════════════════════════════════════════
+          RODAPÉ
+      ════════════════════════════════════════════════════════ */}
+      <footer className="border-t border-border/40 bg-black/30 px-4 py-8 text-center">
+        <div className="max-w-lg mx-auto space-y-3">
+          <p className="text-sm font-black text-muted-foreground">⚽ Super Bolão da Copa 2026</p>
+          <p className="text-xs text-muted-foreground">
+            Pagamentos processados com{" "}
+            <span className="font-semibold text-foreground">Mercado Pago</span>
+          </p>
+          <div className="flex items-center justify-center gap-4 text-xs">
+            <a
+              href="/privacidade"
+              className="text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors"
+            >
+              Política de Privacidade
+            </a>
+          </div>
+          <p className="text-[10px] text-muted-foreground/60">
+            © {new Date().getFullYear()} Super Bolão — Todos os direitos reservados
+          </p>
+        </div>
+      </footer>
 
     </div>
   );

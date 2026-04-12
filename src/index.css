@@ -177,3 +177,18 @@
 .animate-shiny-slide {
   animation: shiny-slide 4s infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee,
+  .animate-marquee-vertical {
+    animation-play-state: paused;
+  }
+
+  .animate-grid,
+  .animate-float,
+  .animate-slide-up,
+  .animate-pulse-gold,
+  .animate-shiny-slide {
+    animation-play-state: paused;
+  }
+}

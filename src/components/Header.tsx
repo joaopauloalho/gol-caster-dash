@@ -1,10 +1,18 @@
 import { useAuth } from "@/hooks/useAuth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { LogIn, LogOut } from "lucide-react";
+
+const anchorLinks = [
+  { href: "#como-funciona", label: "Como funciona" },
+  { href: "#pontuacao", label: "Pontuação" },
+  { href: "#rankings", label: "Rankings" },
+];
 
 const Header = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isHome = location.pathname === "/";
 
   return (
     <header className="sticky top-0 z-50 bg-glass border-b border-border px-4 py-3 safe-area-top">
@@ -12,6 +20,20 @@ const Header = () => {
         <button onClick={() => navigate("/")} className="font-black text-sm text-foreground">
           ⚽ Super Bolão
         </button>
+
+        {isHome && (
+          <nav className="hidden sm:flex items-center gap-4" aria-label="Âncoras da página">
+            {anchorLinks.map(({ href, label }) => (
+              <a
+                key={href}
+                href={href}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {label}
+              </a>
+            ))}
+          </nav>
+        )}
 
         {user ? (
           <div className="flex items-center gap-3">
