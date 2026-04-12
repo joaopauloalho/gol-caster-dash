@@ -106,9 +106,10 @@ const ToggleField = ({ label, pointsSim, pointsNao, value, onChange, disabled }:
 
 type MatchStatus = "open" | "closed" | "scored";
 
-function getMatchStatus(match: { startsAt?: string | null; scored?: boolean }): MatchStatus {
+function getMatchStatus(match: { startsAt?: string | null; scored?: boolean; date?: string; time?: string }): MatchStatus {
   if (match.scored) return "scored";
-  if (match.startsAt && new Date(match.startsAt) <= new Date()) return "closed";
+  // Usa a mesma janela de 30 min que checkLocked para consistência visual
+  if (checkLocked(match.date, match.time ?? "", match.startsAt, false)) return "closed";
   return "open";
 }
 
@@ -118,7 +119,26 @@ const STATUS_BADGE: Record<MatchStatus, { label: string; className: string }> = 
   scored: { label: "Pontuado",  className: "bg-primary/15 text-primary border border-primary/25" },
 };
 
-// ── Props ──────────────────────────────────────────────────────────────────���──
+// ── Texto explicativo do resultado do palpite ────────────────────────────────
+
+function getPredictionResultLabel(
+  scoreA: number | "",
+  scoreB: number | "",
+  winner: "A" | "X" | "B" | null,
+  resultHome: number,
+  resultAway: number,
+  resultWinner: string | null,
+): string {
+  if (scoreA !== "" && scoreB !== "" && scoreA === resultHome && scoreB === resultAway) {
+    return "Placar exato!";
+  }
+  if (winner !== null && winner === resultWinner) {
+    return "Acertou o vencedor/empate";
+  }
+  return "Resultado não acertado";
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 
 interface MatchCardProps {
   id: number;
@@ -136,11 +156,14 @@ interface MatchCardProps {
   scored?: boolean;
   startsAt?: string | null;
   hasSavedPrediction?: boolean;
+  resultHome?: number | null;
+  resultAway?: number | null;
+  resultWinner?: string | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false, scored, startsAt, hasSavedPrediction: externalHasSaved = false }: MatchCardProps) => {
+const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false, scored, startsAt, hasSavedPrediction: externalHasSaved = false, resultHome = null, resultAway = null, resultWinner = null }: MatchCardProps) => {
   const multiplier  = getPhaseMultiplier(stage ?? "Group Stage");
   const localTime   = getLocalTime(date, time);
   const { user }    = useAuth();
@@ -165,9 +188,10 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
   const [hasSavedPrediction, setHasSavedPrediction] = useState(externalHasSaved);
   const [saved,              setSaved]              = useState(false);
   const [isLocked,           setIsLocked]           = useState(() => checkLocked(date, time, startsAt, scored));
+  const [pointsEarned,       setPointsEarned]       = useState<number | null>(null);
 
   const localKey = user ? `prediction:${user.id}:${id}` : null;
-  const matchStatus = getMatchStatus({ startsAt, scored });
+  const matchStatus = getMatchStatus({ startsAt, scored, date, time });
   const statusBadge = STATUS_BADGE[matchStatus];
 
   // Sync external hasSaved signal (from Matches bulk fetch)
@@ -225,6 +249,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
       setPenalty(       (data.has_penalty      as boolean) ?? null);
       setFirstGoal((data.first_to_score    as "A" | "N" | "B") ?? null);
       setPossession((data.possession_winner as "A" | "B")      ?? null);
+      if (data.points_earned != null) setPointsEarned(data.points_earned as number);
       setHasSavedPrediction(true);
       // Servidor manda: sincroniza localStorage
       if (localKey) {
@@ -290,12 +315,18 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
       return;
     }
 
-    // Anti-fraude: valida horário no servidor
-    if (date) {
+    // Anti-fraude: valida horário no servidor contra deadline de 30 min
+    const deadlineMs = startsAt
+      ? new Date(startsAt).getTime() - 30 * 60 * 1000
+      : date
+        ? parseMatchDateTime(date, time).getTime() - 30 * 60 * 1000
+        : null;
+
+    if (deadlineMs !== null) {
       const { data: serverTime, error: timeErr } = await supabase.rpc("get_server_time");
       if (!timeErr && serverTime) {
-        if (new Date(serverTime as string) >= parseMatchDateTime(date, time)) {
-          toast.error("Prazo encerrado! Este jogo já começou.");
+        if (new Date(serverTime as string).getTime() >= deadlineMs) {
+          toast.error("Apostas encerradas! Faltam menos de 30 minutos para o jogo.");
           setIsLocked(true);
           return;
         }
@@ -378,6 +409,45 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
       {expanded && (
         <div className="px-4 pb-4 space-y-4 animate-slide-up">
           <div className="h-px bg-border" />
+
+          {/* Resultado oficial + pontuação (somente após jogo pontuado) */}
+          {scored && resultHome != null && resultAway != null && (
+            <div className="bg-muted/40 rounded-xl p-4 space-y-3 border border-border">
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold text-center">
+                Resultado Oficial
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <div className="flex items-center gap-2">
+                  <FlagImg teamName={teamA} className="h-5 rounded shadow-sm" />
+                  <span className="text-sm font-bold text-foreground">{teamA}</span>
+                </div>
+                <span className="text-3xl font-black text-foreground tabular-nums">
+                  {resultHome} <span className="text-muted-foreground text-xl">×</span> {resultAway}
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-foreground">{teamB}</span>
+                  <FlagImg teamName={teamB} className="h-5 rounded shadow-sm" />
+                </div>
+              </div>
+
+              {hasSavedPrediction && (
+                <div className="flex flex-col items-center gap-1 pt-1 border-t border-border">
+                  {pointsEarned != null ? (
+                    <>
+                      <span className="text-2xl font-black text-primary tabular-nums">
+                        {pointsEarned} <span className="text-sm font-semibold">pts</span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {getPredictionResultLabel(scoreA, scoreB, winner, resultHome, resultAway, resultWinner)}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground italic">Carregando pontos...</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {isLocked && (
             <div className="flex items-center justify-center gap-2 py-3 rounded-lg bg-muted/60 text-muted-foreground text-xs font-semibold">
