@@ -100,7 +100,9 @@ export function calculateMatchPoints(
     pts += pred.has_red_card ? 12 : 5;
   }
 
-  if (pred.has_penalty  !== null && pred.has_penalty  === result.penalty)       pts += 12;
+  if (pred.has_penalty  !== null && pred.has_penalty  === result.penalty) {
+    pts += pred.has_penalty ? 12 : 5; // Sim certo=12, Não certo=5 (mesmo padrão da expulsão)
+  }
   if (pred.first_to_score  != null && pred.first_to_score  === result.firstToScore)  pts += 8;
   if (pred.possession_winner != null && pred.possession_winner === result.possession) pts += 5;
 

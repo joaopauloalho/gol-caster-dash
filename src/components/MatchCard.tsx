@@ -701,7 +701,7 @@ const MatchCard = ({
                 resultValue={scored ? resultRedCard : undefined}
               />
               <ToggleField
-                label="Terá Pênalti?"    pointsSim={12} pointsNao={12}
+                label="Terá Pênalti?"    pointsSim={12} pointsNao={5}
                 value={penalty}        onChange={setPenalty}        disabled={isLocked}
                 resultValue={scored ? resultPenalty : undefined}
               />
