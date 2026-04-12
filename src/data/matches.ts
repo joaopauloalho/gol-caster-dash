@@ -17,6 +17,12 @@ export interface MatchData {
   resultHome?: number | null;
   resultAway?: number | null;
   resultWinner?: string | null;
+  resultGoalFirstHalf?: boolean | null;
+  resultGoalSecondHalf?: boolean | null;
+  resultRedCard?: boolean | null;
+  resultPenalty?: boolean | null;
+  resultFirstToScore?: string | null;
+  resultPossession?: string | null;
 }
 
 export type PhaseKey = "Brasileirão" | "Grupos" | "32avos" | "Oitavas" | "Quartas" | "Semis" | "Final";
@@ -109,5 +115,11 @@ export async function fetchMatchesByPhase(phase: PhaseKey): Promise<MatchData[]>
     resultHome: row.result_home ?? null,
     resultAway: row.result_away ?? null,
     resultWinner: row.result_winner ?? null,
+    resultGoalFirstHalf: row.result_goal_first_half ?? null,
+    resultGoalSecondHalf: row.result_goal_second_half ?? null,
+    resultRedCard: row.result_red_card ?? null,
+    resultPenalty: row.result_penalty ?? null,
+    resultFirstToScore: row.result_first_to_score ?? null,
+    resultPossession: row.result_possession ?? null,
   }));
 }

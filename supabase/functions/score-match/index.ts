@@ -100,7 +100,7 @@ function calculateMatchPoints(p: Pred, r: Res): number {
   if (p.has_red_card !== null && p.has_red_card === r.redCard) {
     pts += p.has_red_card ? 12 : 5; // Sim certo=12, Não certo=5
   }
-  if (p.has_penalty  !== null && p.has_penalty  === r.penalty)      pts += 7;
+  if (p.has_penalty  !== null && p.has_penalty  === r.penalty)      pts += 12;
   if (p.first_to_score  != null && p.first_to_score  === r.firstToScore)  pts += 8;
   if (p.possession_winner != null && p.possession_winner === r.possession) pts += 5;
 

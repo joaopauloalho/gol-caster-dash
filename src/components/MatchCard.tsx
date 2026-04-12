@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ChevronDown, ChevronUp, Check, Zap, Loader2, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -49,18 +49,87 @@ function getLocalTime(date: string | undefined, time: string): string {
   } catch { return time; }
 }
 
-/** Retorna true se faltam ≤30 min para o início, jogo já começou, ou partida já foi pontuada */
-function checkLocked(date: string | undefined, time: string, startsAt?: string | null, scored?: boolean): boolean {
-  if (scored) return true;
-  // Usa starts_at (UTC ISO) diretamente quando disponível
+// ── UTC-safe timestamp parser ─────────────────────────────────────────────────
+// Supabase timestamptz returns ISO strings like "2026-06-14T22:00:00+00:00".
+// If the string has no timezone suffix (naive), force UTC interpretation with 'Z'.
+function parseStartMs(iso: string): number {
+  const hasZone = /[Zz]$|[+-]\d{2}:\d{2}$/.test(iso);
+  return hasZone ? new Date(iso).getTime() : new Date(iso + "Z").getTime();
+}
+
+// ── 4-state match status ──────────────────────────────────────────────────────
+
+type MatchStatus = "open" | "locked" | "live" | "scored";
+
+function computeStatus(
+  startsAt: string | null | undefined,
+  date: string | undefined,
+  time: string,
+  scored: boolean | undefined,
+): MatchStatus {
+  if (scored) return "scored";
+
+  // Resolve start time in UTC milliseconds
+  let startMs: number | null = null;
   if (startsAt) {
-    return Date.now() >= new Date(startsAt).getTime() - 30 * 60 * 1000;
+    startMs = parseStartMs(startsAt);
+  } else if (date) {
+    try { startMs = parseMatchDateTime(date, time).getTime(); } catch { /* skip */ }
   }
-  if (!date) return false;
-  try {
-    const start = parseMatchDateTime(date, time);
-    return Date.now() >= start.getTime() - 30 * 60 * 1000;
-  } catch { return false; }
+
+  if (startMs === null) return "open";
+
+  const now = Date.now();
+  if (now >= startMs)                           return "live";
+  if (now >= startMs - 30 * 60 * 1000)         return "locked";
+  return "open";
+}
+
+// ── Per-state visual config ───────────────────────────────────────────────────
+
+interface StatusStyle {
+  badge: JSX.Element;
+  cardRing: string;
+  cardBg: string;
+}
+
+const LIVE_BADGE = (
+  <span className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+    <span className="relative flex h-2 w-2 shrink-0">
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+    </span>
+    Ao Vivo
+  </span>
+);
+
+function getStatusStyle(status: MatchStatus): StatusStyle {
+  switch (status) {
+    case "open":
+      return {
+        badge: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">Aberto</span>,
+        cardRing: "border-l-[3px] border-l-green-500/50",
+        cardBg:   "",
+      };
+    case "locked":
+      return {
+        badge: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/25">Encerrado</span>,
+        cardRing: "border-l-[3px] border-l-amber-500/60",
+        cardBg:   "bg-amber-500/[0.02]",
+      };
+    case "live":
+      return {
+        badge: LIVE_BADGE,
+        cardRing: "border-l-[3px] border-l-red-500",
+        cardBg:   "bg-red-500/[0.03]",
+      };
+    case "scored":
+      return {
+        badge: <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/25">Pontuado</span>,
+        cardRing: "border-l-[3px] border-l-muted-foreground/20",
+        cardBg:   "",
+      };
+  }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -78,65 +147,58 @@ interface ToggleFieldProps {
   value: boolean | null;
   onChange: (v: boolean | null) => void;
   disabled?: boolean;
+  /** When provided (scored state), shows which answer is correct */
+  resultValue?: boolean | null;
 }
-const ToggleField = ({ label, pointsSim, pointsNao, value, onChange, disabled }: ToggleFieldProps) => {
-  const ptLabel = pointsSim === pointsNao ? `${pointsSim} pts` : `Sim ${pointsSim} / Não ${pointsNao} pts`;
+
+const ToggleField = ({ label, pointsSim, pointsNao, value, onChange, disabled, resultValue }: ToggleFieldProps) => {
+  const isScored = resultValue !== undefined && resultValue !== null;
+  const ptLabel  = pointsSim === pointsNao ? `${pointsSim} pts` : `Sim ${pointsSim} / Não ${pointsNao} pts`;
+  const userCorrect = isScored && value === resultValue;
+
+  const simIsCorrect   = isScored && resultValue === true;
+  const naoIsCorrect   = isScored && resultValue === false;
+  const userPickedSim  = value === true;
+  const userPickedNao  = value === false;
+
+  function simClass(): string {
+    if (isScored) {
+      if (simIsCorrect)                            return "bg-green-500/20 text-green-400 border border-green-500/30";
+      if (userPickedSim && !simIsCorrect)           return "bg-red-500/20 text-red-400/70 border border-red-500/20";
+      return "bg-muted/40 text-muted-foreground/40";
+    }
+    return value === true ? "bg-secondary text-secondary-foreground" : "bg-muted text-muted-foreground disabled:opacity-40";
+  }
+  function naoClass(): string {
+    if (isScored) {
+      if (naoIsCorrect)                            return "bg-green-500/20 text-green-400 border border-green-500/30";
+      if (userPickedNao && !naoIsCorrect)           return "bg-red-500/20 text-red-400/70 border border-red-500/20";
+      return "bg-muted/40 text-muted-foreground/40";
+    }
+    return value === false ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground disabled:opacity-40";
+  }
+
   return (
-    <div className="bg-muted/50 rounded-lg p-3">
-      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
-        {label} <span className="text-primary">({ptLabel})</span>
+    <div className={`rounded-lg p-3 transition-colors ${userCorrect ? "bg-green-500/10 border border-green-500/20" : "bg-muted/50"}`}>
+      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center justify-between">
+        <span>{label} <span className="text-primary">({ptLabel})</span></span>
+        {userCorrect && <Check className="w-3.5 h-3.5 text-green-400 shrink-0" />}
       </label>
       <div className="flex gap-2">
         <button
           onClick={() => !disabled && onChange(value === true ? null : true)}
           disabled={disabled}
-          className={`flex-1 py-2 rounded-md text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${value === true ? "bg-secondary text-secondary-foreground" : "bg-muted text-muted-foreground"}`}
+          className={`flex-1 py-2 rounded-md text-xs font-bold transition-all disabled:cursor-not-allowed ${simClass()}`}
         >Sim</button>
         <button
           onClick={() => !disabled && onChange(value === false ? null : false)}
           disabled={disabled}
-          className={`flex-1 py-2 rounded-md text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${value === false ? "bg-destructive text-destructive-foreground" : "bg-muted text-muted-foreground"}`}
+          className={`flex-1 py-2 rounded-md text-xs font-bold transition-all disabled:cursor-not-allowed ${naoClass()}`}
         >Não</button>
       </div>
     </div>
   );
 };
-
-// ── Status badge ─────────────────────────────────────────────────────────────
-
-type MatchStatus = "open" | "closed" | "scored";
-
-function getMatchStatus(match: { startsAt?: string | null; scored?: boolean; date?: string; time?: string }): MatchStatus {
-  if (match.scored) return "scored";
-  // Usa a mesma janela de 30 min que checkLocked para consistência visual
-  if (checkLocked(match.date, match.time ?? "", match.startsAt, false)) return "closed";
-  return "open";
-}
-
-const STATUS_BADGE: Record<MatchStatus, { label: string; className: string }> = {
-  open:   { label: "Aberto",    className: "bg-green-500/15 text-green-400 border border-green-500/25" },
-  closed: { label: "Encerrado", className: "bg-muted text-muted-foreground border border-border" },
-  scored: { label: "Pontuado",  className: "bg-primary/15 text-primary border border-primary/25" },
-};
-
-// ── Texto explicativo do resultado do palpite ────────────────────────────────
-
-function getPredictionResultLabel(
-  scoreA: number | "",
-  scoreB: number | "",
-  winner: "A" | "X" | "B" | null,
-  resultHome: number,
-  resultAway: number,
-  resultWinner: string | null,
-): string {
-  if (scoreA !== "" && scoreB !== "" && scoreA === resultHome && scoreB === resultAway) {
-    return "Placar exato!";
-  }
-  if (winner !== null && winner === resultWinner) {
-    return "Acertou o vencedor/empate";
-  }
-  return "Resultado não acertado";
-}
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -156,21 +218,36 @@ interface MatchCardProps {
   scored?: boolean;
   startsAt?: string | null;
   hasSavedPrediction?: boolean;
+  // Result fields (populated after scoring)
   resultHome?: number | null;
   resultAway?: number | null;
   resultWinner?: string | null;
+  resultGoalFirstHalf?: boolean | null;
+  resultGoalSecondHalf?: boolean | null;
+  resultRedCard?: boolean | null;
+  resultPenalty?: boolean | null;
+  resultFirstToScore?: string | null;
+  resultPossession?: string | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false, scored, startsAt, hasSavedPrediction: externalHasSaved = false, resultHome = null, resultAway = null, resultWinner = null }: MatchCardProps) => {
-  const multiplier  = getPhaseMultiplier(stage ?? "Group Stage");
-  const localTime   = getLocalTime(date, time);
-  const { user }    = useAuth();
-  const { isActive }= useSubscription();
-  const { settings }= useSiteSettings();
+const MatchCard = ({
+  id, teamA, teamB, time, group, stage, date,
+  hasPaid = false, scored, startsAt,
+  hasSavedPrediction: externalHasSaved = false,
+  resultHome = null, resultAway = null, resultWinner = null,
+  resultGoalFirstHalf = null, resultGoalSecondHalf = null,
+  resultRedCard = null, resultPenalty = null,
+  resultFirstToScore = null, resultPossession = null,
+}: MatchCardProps) => {
+  const multiplier   = getPhaseMultiplier(stage ?? "Group Stage");
+  const localTime    = getLocalTime(date, time);
+  const { user }     = useAuth();
+  const { isActive } = useSubscription();
+  const { settings } = useSiteSettings();
   const paywallActive = settings.feature_flags?.paywall_active ?? true;
-  const navigate    = useNavigate();
+  const navigate     = useNavigate();
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [expanded,           setExpanded]           = useState(false);
@@ -187,24 +264,28 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
   const [possession,         setPossession]         = useState<"A" | "B" | null>(null);
   const [hasSavedPrediction, setHasSavedPrediction] = useState(externalHasSaved);
   const [saved,              setSaved]              = useState(false);
-  const [isLocked,           setIsLocked]           = useState(() => checkLocked(date, time, startsAt, scored));
   const [pointsEarned,       setPointsEarned]       = useState<number | null>(null);
 
+  // ── Reactive status (recalculated every 30s) ────────────────────────────────
+  const [matchStatus, setMatchStatus] = useState<MatchStatus>(() =>
+    computeStatus(startsAt, date, time, scored)
+  );
+
+  useEffect(() => {
+    const update = () => setMatchStatus(computeStatus(startsAt, date, time, scored));
+    update();
+    const t = setInterval(update, 30_000);
+    return () => clearInterval(t);
+  }, [startsAt, date, time, scored]);
+
+  const isLocked = matchStatus !== "open";
+  const statusStyle = getStatusStyle(matchStatus);
   const localKey = user ? `prediction:${user.id}:${id}` : null;
-  const matchStatus = getMatchStatus({ startsAt, scored, date, time });
-  const statusBadge = STATUS_BADGE[matchStatus];
 
   // Sync external hasSaved signal (from Matches bulk fetch)
   useEffect(() => {
     if (externalHasSaved) setHasSavedPrediction(true);
   }, [externalHasSaved]);
-
-  // ── Deadline lock — verifica a cada 30s ─────────────────────────────────────
-  useEffect(() => {
-    setIsLocked(checkLocked(date, time, startsAt, scored));
-    const t = setInterval(() => setIsLocked(checkLocked(date, time, startsAt, scored)), 30_000);
-    return () => clearInterval(t);
-  }, [date, time, startsAt, scored]);
 
   // ── Hydration 1: localStorage (síncrono, sem flicker) ───────────────────────
   useEffect(() => {
@@ -247,11 +328,10 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
       setGoalSecondHalf((data.goal_second_half as boolean) ?? null);
       setRedCard(       (data.has_red_card     as boolean) ?? null);
       setPenalty(       (data.has_penalty      as boolean) ?? null);
-      setFirstGoal((data.first_to_score    as "A" | "N" | "B") ?? null);
+      setFirstGoal( (data.first_to_score    as "A" | "N" | "B") ?? null);
       setPossession((data.possession_winner as "A" | "B")      ?? null);
       if (data.points_earned != null) setPointsEarned(data.points_earned as number);
       setHasSavedPrediction(true);
-      // Servidor manda: sincroniza localStorage
       if (localKey) {
         try {
           localStorage.setItem(localKey, JSON.stringify({
@@ -267,18 +347,29 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
     setLoadingPrediction(false);
   }, [user, id, predictionLoaded, localKey]);
 
-  // Auto-fetch ao montar quando usuário estiver disponível
   useEffect(() => {
     if (user) fetchFromServer();
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Também carrega ao expandir (cobre o caso de user que fez login depois do mount)
   const handleToggleExpand = () => {
     if (!expanded && !predictionLoaded) fetchFromServer();
     setExpanded(e => !e);
   };
 
-  // ── Contagem de campos preenchidos ───────────────────────────────────────────
+  // ── Field-level correctness (computed when scored) ──────────────────────────
+  const fieldChecks = useMemo(() => {
+    if (!scored || resultHome == null || resultAway == null) return null;
+    return {
+      scoreHome:    scoreA !== "" && (scoreA as number) === resultHome,
+      scoreAway:    scoreB !== "" && (scoreB as number) === resultAway,
+      winner:       winner !== null && winner === resultWinner,
+      firstGoal:    firstGoal !== null && firstGoal === resultFirstToScore,
+      possession:   possession !== null && possession === resultPossession,
+    };
+  }, [scored, resultHome, resultAway, resultWinner, resultFirstToScore, resultPossession,
+      scoreA, scoreB, winner, firstGoal, possession]);
+
+  // ── Filled-fields counter ────────────────────────────────────────────────────
   const filledCount = [
     scoreA !== "" && scoreB !== "",
     winner !== null,
@@ -290,12 +381,12 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
     possession !== null,
   ].filter(Boolean).length;
 
-  // ── Rótulo do botão principal ────────────────────────────────────────────────
+  // ── Botão label / class ──────────────────────────────────────────────────────
   const buttonLabel = () => {
-    if (isLocked)          return <><Lock className="w-4 h-4" /> Apostas Encerradas</>;
-    if (saved)             return <><Check className="w-4 h-4" /> Palpite Salvo!</>;
-    if (hasSavedPrediction)return <><Zap className="w-4 h-4" /> Alterar Palpite</>;
-    return                        <><Zap className="w-4 h-4" /> Salvar Palpite</>;
+    if (isLocked)           return <><Lock className="w-4 h-4" /> Apostas Encerradas</>;
+    if (saved)              return <><Check className="w-4 h-4" /> Palpite Salvo!</>;
+    if (hasSavedPrediction) return <><Zap className="w-4 h-4" /> Alterar Palpite</>;
+    return                         <><Zap className="w-4 h-4" /> Salvar Palpite</>;
   };
 
   const buttonClass = () => {
@@ -315,9 +406,9 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
       return;
     }
 
-    // Anti-fraude: valida horário no servidor contra deadline de 30 min
+    // Anti-fraude: valida horário no servidor contra deadline de 30 min (UTC)
     const deadlineMs = startsAt
-      ? new Date(startsAt).getTime() - 30 * 60 * 1000
+      ? parseStartMs(startsAt) - 30 * 60 * 1000
       : date
         ? parseMatchDateTime(date, time).getTime() - 30 * 60 * 1000
         : null;
@@ -327,7 +418,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
       if (!timeErr && serverTime) {
         if (new Date(serverTime as string).getTime() >= deadlineMs) {
           toast.error("Apostas encerradas! Faltam menos de 30 minutos para o jogo.");
-          setIsLocked(true);
+          setMatchStatus("locked");
           return;
         }
       }
@@ -335,22 +426,21 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
 
     const { error } = await supabase.from("predictions").upsert({
       user_id: user.id, match_id: id,
-      home_score:       scoreA === "" ? null : (scoreA as number),
-      away_score:       scoreB === "" ? null : (scoreB as number),
-      winner_pick:      winner,
-      goal_first_half:  goalFirstHalf,
-      goal_second_half: goalSecondHalf,
-      has_red_card:     redCard,
-      has_penalty:      penalty,
-      first_to_score:   firstGoal,
-      possession_winner:possession,
-      points_earned:    0,
-      updated_at:       new Date().toISOString(),
+      home_score:        scoreA === "" ? null : (scoreA as number),
+      away_score:        scoreB === "" ? null : (scoreB as number),
+      winner_pick:       winner,
+      goal_first_half:   goalFirstHalf,
+      goal_second_half:  goalSecondHalf,
+      has_red_card:      redCard,
+      has_penalty:       penalty,
+      first_to_score:    firstGoal,
+      possession_winner: possession,
+      points_earned:     0,
+      updated_at:        new Date().toISOString(),
     }, { onConflict: "user_id,match_id" });
 
     if (error) { toast.error("Erro ao salvar palpite."); return; }
 
-    // Persiste localmente após confirmação
     if (localKey) {
       try {
         localStorage.setItem(localKey, JSON.stringify({
@@ -364,53 +454,106 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
 
     setHasSavedPrediction(true);
     setSaved(true);
-    setTimeout(() => setSaved(false), 3000); // 3s → volta para "Alterar Palpite"
+    setTimeout(() => setSaved(false), 3000);
   };
+
+  // ── Helpers de estilo condicional para campos de placar ───────────────────────
+  function scoreInputClass(side: "home" | "away"): string {
+    const isCorrect = side === "home" ? fieldChecks?.scoreHome : fieldChecks?.scoreAway;
+    const val       = side === "home" ? scoreA : scoreB;
+    const base      = "w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed";
+    if (scored && val !== "") {
+      if (isCorrect) return `${base} border-2 border-green-500 text-green-400`;
+      return `${base} border border-red-500/40 text-muted-foreground`;
+    }
+    return `${base} border border-border focus:border-primary focus:ring-1 focus:ring-primary`;
+  }
+
+  function choiceButtonClass(selected: boolean, correct: boolean | null): string {
+    const base = "py-2.5 px-3 rounded-lg text-xs font-bold transition-all disabled:cursor-not-allowed";
+    if (scored && correct !== null) {
+      if (correct)   return `${base} bg-green-500/20 text-green-400 border border-green-500/30`;
+      if (selected)  return `${base} bg-red-500/15 text-red-400/70 border border-red-500/20`;
+      return `${base} bg-muted/40 text-muted-foreground/40`;
+    }
+    if (selected) return `${base} bg-primary text-primary-foreground shadow-lg`;
+    return `${base} bg-muted text-muted-foreground hover:text-foreground disabled:opacity-40`;
+  }
+
+  function altChoiceClass(selected: boolean, correct: boolean | null): string {
+    const base = "py-2.5 px-3 rounded-lg text-xs font-bold transition-all disabled:cursor-not-allowed";
+    if (scored && correct !== null) {
+      if (correct)   return `${base} bg-green-500/20 text-green-400 border border-green-500/30`;
+      if (selected)  return `${base} bg-red-500/15 text-red-400/70 border border-red-500/20`;
+      return `${base} bg-muted/40 text-muted-foreground/40`;
+    }
+    if (selected) return `${base} bg-secondary text-secondary-foreground shadow-lg`;
+    return `${base} bg-muted text-muted-foreground hover:text-foreground disabled:opacity-40`;
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className={`card-match rounded-xl overflow-hidden transition-all duration-300 ${expanded ? "ring-1 ring-primary/30" : ""}`}>
-      {/* Header */}
+    <div className={`card-match rounded-xl overflow-hidden transition-all duration-300 ${statusStyle.cardBg} ${statusStyle.cardRing} ${expanded ? "ring-1 ring-primary/20" : ""}`}>
+
+      {/* ── Header ── */}
       <button onClick={handleToggleExpand} className="w-full flex items-center justify-between p-4">
-        <div className="flex items-center gap-3 flex-1">
-          <div className="flex items-center gap-2 flex-1">
-            <FlagImg teamName={teamA} className="h-6 rounded shadow-sm" />
-            <span className="font-bold text-sm text-foreground">{teamA}</span>
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <FlagImg teamName={teamA} className="h-6 rounded shadow-sm shrink-0" />
+            <span className="font-bold text-sm text-foreground truncate">{teamA}</span>
           </div>
-          <div className="flex flex-col items-center px-3">
+          <div className="flex flex-col items-center px-2 shrink-0">
             <span className="text-xs text-muted-foreground font-medium uppercase">{group}</span>
-            <span className="text-xs font-bold text-primary">VS</span>
+            {/* Show result score when scored, else VS */}
+            {scored && resultHome != null && resultAway != null ? (
+              <span className="text-sm font-black text-foreground tabular-nums">
+                {resultHome}<span className="text-muted-foreground mx-0.5">–</span>{resultAway}
+              </span>
+            ) : (
+              <span className="text-xs font-bold text-primary">VS</span>
+            )}
             <span className="text-xs text-muted-foreground">{localTime}</span>
           </div>
-          <div className="flex items-center gap-2 flex-1 justify-end">
-            <span className="font-bold text-sm text-foreground">{teamB}</span>
-            <FlagImg teamName={teamB} className="h-6 rounded shadow-sm" />
+          <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
+            <span className="font-bold text-sm text-foreground truncate text-right">{teamB}</span>
+            <FlagImg teamName={teamB} className="h-6 rounded shadow-sm shrink-0" />
           </div>
         </div>
-        <div className="flex items-center gap-2 ml-3">
+
+        {/* Right-side badges */}
+        <div className="flex items-center gap-1.5 ml-2 shrink-0">
           {/* Status badge */}
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusBadge.className}`}>
-            {statusBadge.label}
-          </span>
-          {/* Check se já palpitou */}
-          {hasSavedPrediction && (
+          {statusStyle.badge}
+
+          {/* Points badge (scored + prediction loaded) */}
+          {scored && hasSavedPrediction && pointsEarned != null && (
+            <span className="flex items-center justify-center min-w-[2rem] h-6 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-black tabular-nums">
+              {pointsEarned}pts
+            </span>
+          )}
+
+          {/* Prediction check */}
+          {hasSavedPrediction && matchStatus === "open" && (
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">✓</span>
           )}
-          {filledCount > 0 && (
+
+          {/* Filled count (open only) */}
+          {filledCount > 0 && matchStatus === "open" && (
             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
               filledCount === 8 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
             }`}>{filledCount}/8</span>
           )}
+
           {expanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
         </div>
       </button>
 
-      {/* Body */}
+      {/* ── Body ── */}
       {expanded && (
         <div className="px-4 pb-4 space-y-4 animate-slide-up">
           <div className="h-px bg-border" />
 
-          {/* Resultado oficial + pontuação (somente após jogo pontuado) */}
+          {/* Resultado oficial + pontuação detalhada */}
           {scored && resultHome != null && resultAway != null && (
             <div className="bg-muted/40 rounded-xl p-4 space-y-3 border border-border">
               <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold text-center">
@@ -422,7 +565,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
                   <span className="text-sm font-bold text-foreground">{teamA}</span>
                 </div>
                 <span className="text-3xl font-black text-foreground tabular-nums">
-                  {resultHome} <span className="text-muted-foreground text-xl">×</span> {resultAway}
+                  {resultHome}<span className="text-muted-foreground text-xl mx-1">×</span>{resultAway}
                 </span>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-foreground">{teamB}</span>
@@ -431,27 +574,46 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
               </div>
 
               {hasSavedPrediction && (
-                <div className="flex flex-col items-center gap-1 pt-1 border-t border-border">
+                <div className="flex flex-col items-center gap-1 pt-2 border-t border-border">
                   {pointsEarned != null ? (
                     <>
-                      <span className="text-2xl font-black text-primary tabular-nums">
-                        {pointsEarned} <span className="text-sm font-semibold">pts</span>
+                      <span className="text-3xl font-black text-primary tabular-nums leading-tight">
+                        {pointsEarned}<span className="text-base font-semibold ml-1">pts</span>
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        {getPredictionResultLabel(scoreA, scoreB, winner, resultHome, resultAway, resultWinner)}
+                        {fieldChecks?.scoreHome && fieldChecks?.scoreAway
+                          ? "Placar exato!"
+                          : fieldChecks?.winner
+                            ? "Acertou o vencedor/empate"
+                            : "Resultado não acertado"}
                       </span>
                     </>
                   ) : (
-                    <span className="text-xs text-muted-foreground italic">Carregando pontos...</span>
+                    <span className="text-xs text-muted-foreground italic flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin" /> Carregando pontos...
+                    </span>
                   )}
                 </div>
               )}
             </div>
           )}
 
-          {isLocked && (
+          {/* Banner de travado/ao vivo */}
+          {(matchStatus === "locked" || matchStatus === "live") && (
+            <div className={`flex items-center justify-center gap-2 py-3 rounded-lg text-xs font-semibold ${
+              matchStatus === "live"
+                ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+            }`}>
+              {matchStatus === "live"
+                ? <><span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"/><span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"/></span> Jogo em andamento</>
+                : <><Lock className="w-4 h-4" /> Apostas encerradas — jogo começa em breve</>
+              }
+            </div>
+          )}
+          {matchStatus === "scored" && (
             <div className="flex items-center justify-center gap-2 py-3 rounded-lg bg-muted/60 text-muted-foreground text-xs font-semibold">
-              <Lock className="w-4 h-4" /> {scored ? "Partida encerrada" : "Apostas encerradas — jogo começa em breve"}
+              <Lock className="w-4 h-4" /> Partida encerrada
             </div>
           )}
 
@@ -462,10 +624,14 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
           )}
 
           <div className={loadingPrediction ? "hidden" : "space-y-4"}>
+
             {/* Placar */}
             <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+              <label className={`text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5 ${
+                fieldChecks?.scoreHome && fieldChecks?.scoreAway ? "text-green-400" : "text-muted-foreground"
+              }`}>
                 Placar Exato <span className="text-primary">(25 pts)</span>
+                {fieldChecks?.scoreHome && fieldChecks?.scoreAway && <Check className="w-3.5 h-3.5" />}
               </label>
               <div className="flex items-center justify-center gap-3">
                 <div className="flex items-center gap-2">
@@ -474,7 +640,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
                     type="number" min={0} max={20} placeholder="0"
                     value={scoreA} disabled={isLocked}
                     onChange={e => setScoreA(e.target.value === "" ? "" : parseInt(e.target.value))}
-                    className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={scoreInputClass("home")}
                   />
                 </div>
                 <span className="text-muted-foreground font-bold text-lg">×</span>
@@ -483,7 +649,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
                     type="number" min={0} max={20} placeholder="0"
                     value={scoreB} disabled={isLocked}
                     onChange={e => setScoreB(e.target.value === "" ? "" : parseInt(e.target.value))}
-                    className="w-14 h-12 rounded-lg bg-muted text-center text-xl font-black text-foreground border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    className={scoreInputClass("away")}
                   />
                   <FlagImg teamName={teamB} className="h-5 rounded shadow-sm" />
                 </div>
@@ -492,57 +658,102 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
 
             {/* Vencedor */}
             <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+              <label className={`text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5 ${
+                fieldChecks?.winner ? "text-green-400" : "text-muted-foreground"
+              }`}>
                 Vencedor / Empate <span className="text-primary">(10 pts)</span>
+                {fieldChecks?.winner && <Check className="w-3.5 h-3.5" />}
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {([{ key: "A" as const, label: teamA }, { key: "X" as const, label: "Empate" }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
-                  <button
-                    key={key} disabled={isLocked}
-                    onClick={() => !isLocked && setWinner(winner === key ? null : key)}
-                    className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${winner === key ? "bg-primary text-primary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-                  >{label}</button>
-                ))}
+                {([
+                  { key: "A" as const, label: teamA },
+                  { key: "X" as const, label: "Empate" },
+                  { key: "B" as const, label: teamB },
+                ]).map(({ key, label }) => {
+                  const isSelected = winner === key;
+                  const isCorrect  = scored && resultWinner != null ? key === resultWinner : null;
+                  return (
+                    <button
+                      key={key} disabled={isLocked}
+                      onClick={() => !isLocked && setWinner(winner === key ? null : key)}
+                      className={choiceButtonClass(isSelected, isCorrect)}
+                    >{label}</button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Toggles */}
             <div className="grid grid-cols-2 gap-3">
-              <ToggleField label="Gol no 1º Tempo"  pointsSim={5}  pointsNao={5}  value={goalFirstHalf}  onChange={setGoalFirstHalf}  disabled={isLocked} />
-              <ToggleField label="Gol no 2º Tempo"  pointsSim={5}  pointsNao={5}  value={goalSecondHalf} onChange={setGoalSecondHalf} disabled={isLocked} />
-              <ToggleField label="Terá Expulsão?"   pointsSim={12} pointsNao={5}  value={redCard}        onChange={setRedCard}        disabled={isLocked} />
-              <ToggleField label="Terá Pênalti?"    pointsSim={7}  pointsNao={7}  value={penalty}        onChange={setPenalty}        disabled={isLocked} />
+              <ToggleField
+                label="Gol no 1º Tempo"  pointsSim={5}  pointsNao={5}
+                value={goalFirstHalf}  onChange={setGoalFirstHalf}  disabled={isLocked}
+                resultValue={scored ? resultGoalFirstHalf : undefined}
+              />
+              <ToggleField
+                label="Gol no 2º Tempo"  pointsSim={5}  pointsNao={5}
+                value={goalSecondHalf} onChange={setGoalSecondHalf} disabled={isLocked}
+                resultValue={scored ? resultGoalSecondHalf : undefined}
+              />
+              <ToggleField
+                label="Terá Expulsão?"   pointsSim={12} pointsNao={5}
+                value={redCard}        onChange={setRedCard}        disabled={isLocked}
+                resultValue={scored ? resultRedCard : undefined}
+              />
+              <ToggleField
+                label="Terá Pênalti?"    pointsSim={12} pointsNao={12}
+                value={penalty}        onChange={setPenalty}        disabled={isLocked}
+                resultValue={scored ? resultPenalty : undefined}
+              />
             </div>
 
             {/* 1º a marcar */}
             <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+              <label className={`text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5 ${
+                fieldChecks?.firstGoal ? "text-green-400" : "text-muted-foreground"
+              }`}>
                 Quem marca 1º? <span className="text-primary">(8 pts)</span>
+                {fieldChecks?.firstGoal && <Check className="w-3.5 h-3.5" />}
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {([{ key: "A" as const, label: teamA }, { key: "N" as const, label: "Ninguém" }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
-                  <button
-                    key={key} disabled={isLocked}
-                    onClick={() => !isLocked && setFirstGoal(firstGoal === key ? null : key)}
-                    className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${firstGoal === key ? "bg-secondary text-secondary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-                  >{label}</button>
-                ))}
+                {([
+                  { key: "A" as const, label: teamA },
+                  { key: "N" as const, label: "Ninguém" },
+                  { key: "B" as const, label: teamB },
+                ]).map(({ key, label }) => {
+                  const isSelected = firstGoal === key;
+                  const isCorrect  = scored && resultFirstToScore != null ? key === resultFirstToScore : null;
+                  return (
+                    <button
+                      key={key} disabled={isLocked}
+                      onClick={() => !isLocked && setFirstGoal(firstGoal === key ? null : key)}
+                      className={altChoiceClass(isSelected, isCorrect)}
+                    >{label}</button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Posse */}
             <div>
-              <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 block">
+              <label className={`text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5 ${
+                fieldChecks?.possession ? "text-green-400" : "text-muted-foreground"
+              }`}>
                 Mais Posse de Bola <span className="text-primary">(5 pts)</span>
+                {fieldChecks?.possession && <Check className="w-3.5 h-3.5" />}
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {([{ key: "A" as const, label: teamA }, { key: "B" as const, label: teamB }]).map(({ key, label }) => (
-                  <button
-                    key={key} disabled={isLocked}
-                    onClick={() => !isLocked && setPossession(possession === key ? null : key)}
-                    className={`py-2.5 px-3 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed ${possession === key ? "bg-secondary text-secondary-foreground shadow-lg" : "bg-muted text-muted-foreground hover:text-foreground"}`}
-                  >{label}</button>
-                ))}
+                {([{ key: "A" as const, label: teamA }, { key: "B" as const, label: teamB }]).map(({ key, label }) => {
+                  const isSelected = possession === key;
+                  const isCorrect  = scored && resultPossession != null ? key === resultPossession : null;
+                  return (
+                    <button
+                      key={key} disabled={isLocked}
+                      onClick={() => !isLocked && setPossession(possession === key ? null : key)}
+                      className={altChoiceClass(isSelected, isCorrect)}
+                    >{label}</button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -557,7 +768,7 @@ const MatchCard = ({ id, teamA, teamB, time, group, stage, date, hasPaid = false
           </button>
 
           {/* Potencial máximo */}
-          {filledCount === 8 && !isLocked && (
+          {filledCount === 8 && matchStatus === "open" && (
             <div className="text-center text-xs text-primary font-semibold animate-pulse-gold p-2 rounded-lg bg-glass-gold">
               🏆 Palpite completo — Potencial: até {MAX_BASE_POINTS * multiplier} pts
               {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier} fase)</span>}

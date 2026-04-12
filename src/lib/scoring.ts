@@ -100,7 +100,7 @@ export function calculateMatchPoints(
     pts += pred.has_red_card ? 12 : 5;
   }
 
-  if (pred.has_penalty  !== null && pred.has_penalty  === result.penalty)       pts += 7;
+  if (pred.has_penalty  !== null && pred.has_penalty  === result.penalty)       pts += 12;
   if (pred.first_to_score  != null && pred.first_to_score  === result.firstToScore)  pts += 8;
   if (pred.possession_winner != null && pred.possession_winner === result.possession) pts += 5;
 

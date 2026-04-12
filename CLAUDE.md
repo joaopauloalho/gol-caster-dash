@@ -131,7 +131,7 @@ Definida em `src/lib/scoring.ts` — **manter IDÊNTICA** à Edge Function `scor
 | Gol no 2º tempo | 5 pts |
 | Cartão vermelho correto (acertou "Sim") | 12 pts |
 | Cartão vermelho correto (acertou "Não") | 5 pts |
-| Pênalti correto | 7 pts |
+| Pênalti correto | 12 pts |
 | 1º a marcar correto | 8 pts |
 | Posse de bola correta | 5 pts |
 
