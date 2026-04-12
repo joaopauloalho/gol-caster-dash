@@ -23,34 +23,10 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-/**
- * AppShell — inner component with access to useLocation.
- *
- * On "/" (landing):
- *   - Outer wrapper is h-[100dvh] flex-col overflow-hidden so the Swiper
- *     inside SnapContainer fills the remaining flex-1 space below the Header.
- *   - BottomNav is hidden (fullscreen snap experience; nav covered by SectionDots).
- *
- * On all other routes: normal scrollable layout with BottomNav.
- */
 const AppShell = () => {
   const { pathname } = useLocation();
-  const isLanding = pathname === "/";
 
-  return isLanding ? (
-    // Fullscreen snap layout: fixed height, no native scroll
-    <div className="flex flex-col h-[100dvh] overflow-hidden bg-background">
-      <Header />
-      {/* flex-1 + overflow-hidden → Swiper fills exactly this box */}
-      <div className="flex-1 overflow-hidden min-h-0">
-        <Routes>
-          <Route path="/" element={<Index />} />
-        </Routes>
-      </div>
-      {/* BottomNav intentionally omitted on landing */}
-    </div>
-  ) : (
-    // Normal scrollable layout for all other pages
+  return (
     <>
       <Header />
       <Routes>
@@ -68,7 +44,7 @@ const AppShell = () => {
         <Route path="/privacidade" element={<Privacy />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <BottomNav />
+      {pathname !== "/" && <BottomNav />}
     </>
   );
 };
