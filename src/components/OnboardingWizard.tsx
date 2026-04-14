@@ -298,8 +298,7 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-50 flex flex-col"
-      style={{ background: "linear-gradient(160deg, #0a0a0a 0%, #0f0f0f 60%, #111208 100%)" }}
+      className="fixed inset-0 z-50 flex flex-col bg-background"
     >
       {/* Top bar */}
       <div className="flex-shrink-0 px-6 pt-safe-top pt-6 pb-4 space-y-4">
@@ -600,8 +599,7 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
                         {p === "avista" ? "À Vista" : "Parcelado"}
                       </div>
                       <div
-                        className="text-2xl font-black mb-2"
-                        style={{ color: plan === p ? "#FFD700" : "rgba(255,255,255,0.6)" }}
+                        className={`text-2xl font-black mb-2 ${plan === p ? "text-primary" : "text-white/60"}`}
                       >
                         {p === "avista" ? "R$ 250" : "3× R$ 100"}
                       </div>
@@ -609,7 +607,7 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
                         {p === "avista" ? "Pagamento único" : "3 parcelas mensais"}
                       </div>
                       {p === "avista" && (
-                        <div className="text-xs font-bold mt-2" style={{ color: "#FFD700" }}>
+                        <div className="text-xs font-bold mt-2 text-primary">
                           ★ Melhor valor
                         </div>
                       )}
@@ -658,10 +656,9 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
                   initial={{ scale: 0, rotate: -20 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  className="w-24 h-24 rounded-full flex items-center justify-center border-2 border-primary"
-                  style={{ background: "rgba(234,179,8,0.15)" }}
+                  className="w-24 h-24 rounded-full flex items-center justify-center border-2 border-primary bg-primary/[0.15]"
                 >
-                  <Check className="w-12 h-12" style={{ color: "#FFD700" }} />
+                  <Check className="w-12 h-12 text-primary" />
                 </motion.div>
 
                 <motion.div
@@ -684,7 +681,7 @@ export default function OnboardingWizard({ onClose, referralCode = "", groupInvi
                     className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/4 p-5 text-left space-y-3"
                   >
                     <div className="flex items-center gap-2">
-                      <Gift className="w-4 h-4" style={{ color: "#FFD700" }} />
+                      <Gift className="w-4 h-4 text-primary" />
                       <span className="text-xs font-black text-white">Seu link de indicação</span>
                     </div>
                     <p className="text-xs text-white/40">+200 pts por cada amigo confirmado. Sem limite.</p>
