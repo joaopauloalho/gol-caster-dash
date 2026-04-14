@@ -1,61 +1,124 @@
 import { useState } from "react";
-import { CheckCircle2, XCircle, MessageCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { CheckCircle2, Circle, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
-const WHATSAPP_NUMBER = "5511999999999"; // Replace with real number
+const WHATSAPP_NUMBER = "5511999999999";
+
+const chips = [
+  { id: "palpites",  label: "Palpitou hoje?" },
+  { id: "grupos",   label: "Viu seu grupo?" },
+  { id: "ranking",  label: "Checou o ranking?" },
+];
 
 const DailyChecklist = () => {
-  const [answered, setAnswered] = useState<boolean | null>(null);
+  const [checked, setChecked]   = useState<Set<string>>(new Set());
+  const [answered, setAnswered] = useState(false);
   const navigate = useNavigate();
+
+  const toggle = (id: string) => {
+    setChecked(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const progress = chips.length > 0 ? checked.size / chips.length : 0;
+  const allDone  = checked.size === chips.length;
 
   const openWhatsapp = () => {
     window.open(
       `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Quero receber lembretes do Bolão da Copa! ⚽")}`,
-      "_blank"
+      "_blank",
     );
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-4 space-y-3">
-      <h3 className="text-sm font-black text-foreground">📋 Check do Dia</h3>
+    <motion.div
+      className={cn(
+        "rounded-2xl border p-4 transition-all duration-slow",
+        allDone
+          ? "border-primary/30 bg-primary/[0.06] animate-pulse-gold"
+          : "border-border/60 bg-card",
+      )}
+      layout
+    >
+      {/* Header + progress bar */}
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-black text-foreground uppercase tracking-wider">
+          📋 Check do Dia
+        </span>
+        <span className={cn(
+          "text-[11px] font-bold tabular-nums",
+          allDone ? "text-primary" : "text-muted-foreground",
+        )}>
+          {checked.size}/{chips.length}
+        </span>
+      </div>
 
-      {answered === null ? (
-        <>
-          <p className="text-xs text-muted-foreground">Você já palpitou nos jogos de hoje?</p>
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setAnswered(true)}
-              variant="secondary"
-              className="flex-1 rounded-xl font-bold text-xs"
-            >
-              <CheckCircle2 className="w-4 h-4 mr-1" /> Sim
-            </Button>
-            <Button
+      {/* Progress bar */}
+      <div className="h-1 bg-muted rounded-full mb-4 overflow-hidden">
+        <motion.div
+          className="h-full bg-primary rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${progress * 100}%` }}
+          transition={{ type: "spring", stiffness: 200, damping: 25 }}
+        />
+      </div>
+
+      {/* Chips — horizontal scroll */}
+      <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {chips.map(({ id, label }) => {
+          const done = checked.has(id);
+          return (
+            <button
+              key={id}
               onClick={() => {
-                setAnswered(false);
-                navigate("/jogos");
+                toggle(id);
+                if (id === "palpites" && !done) navigate("/jogos");
               }}
-              variant="outline"
-              className="flex-1 rounded-xl font-bold text-xs"
+              className={cn(
+                "flex items-center gap-1.5 whitespace-nowrap px-3 py-2 rounded-full border text-xs font-semibold transition-all shrink-0",
+                done
+                  ? "bg-green-500/10 border-green-500/30 text-green-400"
+                  : "bg-muted border-border/50 text-muted-foreground hover:text-foreground",
+              )}
             >
-              <XCircle className="w-4 h-4 mr-1" /> Ainda não
-            </Button>
-          </div>
-        </>
-      ) : answered ? (
-        <p className="text-xs text-secondary font-bold">✅ Ótimo! Seus palpites estão registrados.</p>
-      ) : null}
+              {done
+                ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                : <Circle className="w-3.5 h-3.5 shrink-0 opacity-50" />
+              }
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* WhatsApp Reminders */}
+      {/* Completion message */}
+      <AnimatePresence>
+        {allDone && !answered && (
+          <motion.p
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mt-3 text-xs text-primary font-bold text-center"
+          >
+            🏆 Dia perfeito! Todos os checks completos.
+          </motion.p>
+        )}
+      </AnimatePresence>
+
+      {/* WhatsApp reminder */}
       <button
         onClick={openWhatsapp}
-        className="w-full flex items-center gap-2 p-3 rounded-xl bg-secondary/10 border border-secondary/20 text-secondary text-xs font-bold hover:bg-secondary/20 transition-colors"
+        className="mt-3 w-full flex items-center gap-2 p-2.5 rounded-xl bg-secondary/10 border border-secondary/20 text-secondary-foreground text-xs font-semibold hover:bg-secondary/20 transition-colors"
       >
-        <MessageCircle className="w-4 h-4" />
-        Ativar lembretes no WhatsApp
+        <MessageCircle className="w-4 h-4 shrink-0 text-secondary" />
+        <span>Ativar lembretes no WhatsApp</span>
       </button>
-    </div>
+    </motion.div>
   );
 };
 
