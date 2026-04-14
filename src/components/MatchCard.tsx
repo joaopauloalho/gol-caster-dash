@@ -120,13 +120,16 @@ const ScoreControl = ({ value, onChange, disabled, isCorrect, isScored }: ScoreC
 
   useEffect(() => () => stopHold(), []);
 
+  const isEmpty  = value === "";
   const numClass = cn(
     "w-9 text-center font-mono text-2xl font-black tabular-nums select-none",
-    isScored
-      ? isCorrect
-        ? "text-green-400"
-        : "text-muted-foreground/50"
-      : "text-foreground",
+    isEmpty
+      ? "text-muted-foreground/40"
+      : isScored
+        ? isCorrect
+          ? "text-green-400"
+          : "text-muted-foreground/50"
+        : "text-foreground",
   );
 
   const btnClass = cn(
@@ -146,7 +149,7 @@ const ScoreControl = ({ value, onChange, disabled, isCorrect, isScored }: ScoreC
         aria-label="Diminuir"
         className={btnClass}
       >−</button>
-      <span className={numClass}>{numVal}</span>
+      <span className={numClass}>{isEmpty ? "—" : numVal}</span>
       <button
         type="button"
         onPointerDown={() => startHold(increment)}
@@ -265,8 +268,8 @@ const MatchCard = ({
   const [expanded,           setExpanded]           = useState(false);
   const [predictionLoaded,   setPredictionLoaded]   = useState(false);
   const [loadingPrediction,  setLoadingPrediction]  = useState(false);
-  const [scoreA,             setScoreA]             = useState<number | "">(0);
-  const [scoreB,             setScoreB]             = useState<number | "">(0);
+  const [scoreA,             setScoreA]             = useState<number | "">("");
+  const [scoreB,             setScoreB]             = useState<number | "">("");
   const [winner,             setWinner]             = useState<"A" | "X" | "B" | null>(null);
   const [goalFirstHalf,      setGoalFirstHalf]      = useState<boolean | null>(null);
   const [goalSecondHalf,     setGoalSecondHalf]     = useState<boolean | null>(null);
@@ -328,8 +331,8 @@ const MatchCard = ({
       .eq("match_id", id)
       .maybeSingle();
     if (data) {
-      setScoreA(data.home_score       != null ? data.home_score       : 0);
-      setScoreB(data.away_score       != null ? data.away_score       : 0);
+      setScoreA(data.home_score       != null ? data.home_score       : "");
+      setScoreB(data.away_score       != null ? data.away_score       : "");
       setWinner((data.winner_pick     as "A" | "X" | "B") ?? null);
       setGoalFirstHalf( (data.goal_first_half  as boolean) ?? null);
       setGoalSecondHalf((data.goal_second_half as boolean) ?? null);
@@ -564,7 +567,7 @@ const MatchCard = ({
           {/* Team A */}
           <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
             <FlagImg teamName={teamA} className="h-8 rounded shadow-sm" />
-            <span className="text-xs font-bold text-foreground text-center leading-tight truncate w-full text-center">{teamA}</span>
+            <span className="text-xs font-bold text-foreground text-center leading-tight break-words hyphens-auto w-full line-clamp-2">{teamA}</span>
           </div>
 
           {/* Score controls */}
@@ -589,7 +592,7 @@ const MatchCard = ({
           {/* Team B */}
           <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
             <FlagImg teamName={teamB} className="h-8 rounded shadow-sm" />
-            <span className="text-xs font-bold text-foreground text-center leading-tight truncate w-full text-center">{teamB}</span>
+            <span className="text-xs font-bold text-foreground text-center leading-tight break-words hyphens-auto w-full line-clamp-2">{teamB}</span>
           </div>
         </div>
       </div>
@@ -634,36 +637,63 @@ const MatchCard = ({
         )}
 
         {matchStatus === "open" && (
-          <motion.button
-            type="button"
-            onClick={handleSave}
-            disabled={isLocked}
-            whileTap={{ scale: 0.98 }}
-            className={cn(
-              "w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
-              saved
-                ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                : hasSavedPrediction
-                  ? "bg-secondary/20 text-secondary-foreground border border-secondary/30"
-                  : "btn-gold",
+          <>
+            {/* Progress bar — shown when partially filled */}
+            {filledCount > 0 && filledCount < 8 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] text-muted-foreground font-medium px-0.5">
+                  <span>Palpite incompleto</span>
+                  <span className="tabular-nums">{filledCount}/8</span>
+                </div>
+                <div className="h-1 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full bg-primary/60 rounded-full transition-all duration-300"
+                    style={{ width: `${(filledCount / 8) * 100}%` }}
+                  />
+                </div>
+              </div>
             )}
-          >
-            <AnimatePresence mode="wait">
-              {saved ? (
-                <motion.span key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                  <Check className="w-4 h-4" /> Palpite Salvo!
-                </motion.span>
-              ) : hasSavedPrediction ? (
-                <motion.span key="update" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                  <Zap className="w-4 h-4" /> Alterar Palpite
-                </motion.span>
-              ) : (
-                <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                  <Zap className="w-4 h-4" /> Confirmar Palpite
-                </motion.span>
+
+            <motion.button
+              type="button"
+              onClick={handleSave}
+              disabled={isLocked || filledCount === 0}
+              whileTap={filledCount > 0 ? { scale: 0.98 } : undefined}
+              className={cn(
+                "w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
+                saved
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                  : (hasSavedPrediction && !saved)
+                    ? "bg-muted/60 text-muted-foreground border border-border/50"
+                    : filledCount === 8
+                      ? "btn-gold animate-pulse-gold"
+                      : filledCount > 0
+                        ? "btn-gold"
+                        : "bg-muted/40 text-muted-foreground/40 cursor-not-allowed border border-border/30",
               )}
-            </AnimatePresence>
-          </motion.button>
+            >
+              <AnimatePresence mode="wait">
+                {saved ? (
+                  <motion.span key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                    <Check className="w-4 h-4" /> Palpite Salvo!
+                  </motion.span>
+                ) : hasSavedPrediction ? (
+                  <motion.span key="update" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                    <Zap className="w-4 h-4" /> Alterar Palpite
+                  </motion.span>
+                ) : filledCount === 0 ? (
+                  <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                    <Zap className="w-4 h-4" /> Use − + para palpitar
+                  </motion.span>
+                ) : (
+                  <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                    <Zap className="w-4 h-4" /> Confirmar Palpite
+                    {filledCount === 8 && <span className="text-[10px] opacity-70">8/8 ✓</span>}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          </>
         )}
 
         {/* Completeness hint */}
