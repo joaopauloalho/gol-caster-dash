@@ -224,3 +224,18 @@ SITE_URL                 # URL do frontend (CORS)
 4. **RLS** — ao criar novas tabelas, sempre habilitar RLS e definir políticas explícitas. Usar `SUPABASE_SERVICE_ROLE_KEY` apenas em Edge Functions server-side.
 5. **Preços em centavos** — `create-mp-preference` e `validate-coupon` usam a constante `PLAN_AMOUNTS` como fonte de verdade. Nunca aceitar valores monetários vindos do cliente.
 6. **`espn_id`** — campo único em `matches`; upserts devem usar `onConflict: "espn_id"`.
+
+Add under a ## Database / Supabase section in CLAUDE.md\n\nAfter creating or modifying Supabase schema, always generate a migration file and verify all referenced columns exist before running SQL.
+Add under ## Git Workflow section\n\nAfter code changes build successfully, auto-commit and push to GitHub unless told otherwise.
+Add under ## Design Principles section\n\nPrefer simple auth flows (auto-create users) over complex admin-gated flows unless explicitly required.
+## MCP Servers
+
+### 21st.dev Magic
+- **Installation**: 21st.dev magic
+- **Configuration**: {"API_KEY": "an_sk_6a3a33b3d665021dfd45720e228e7e37b0ddb72bac6c27e543dcd03f31f67f54"}
+- **Description**: Create crafted UI components inspired by the best 21st.dev design engine.
+
+## Context Engineering Workflow
+- Use `/generate-prp INITIAL.md` to create a technical blueprint.
+- Verify the generated PRP in the `PRPs/` folder.
+- Use `/execute-prp PRPs/[file].md` to implement the feature step-by-step.
