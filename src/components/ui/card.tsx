@@ -1,20 +1,63 @@
 import * as React from "react"
-
+import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
-const Card = React.forwardRef<
-  HTMLDivElement,
-  React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
-      className
-    )}
-    {...props}
-  />
-))
+/* ── Card variant system ──────────────────────────────────────────── */
+const cardVariants = cva(
+  "rounded-2xl border transition-all duration-normal",
+  {
+    variants: {
+      variant: {
+        // Standard surface card — replaces old rounded-lg shadow-sm
+        default: "bg-card text-card-foreground shadow-card border-border/60",
+
+        // Floats higher with subtle lift on hover
+        elevated: [
+          "bg-card text-card-foreground border-border/40",
+          "shadow-lg hover:-translate-y-0.5 hover:shadow-xl",
+        ],
+
+        // Compact stats display — number + label
+        stat: "bg-card text-card-foreground shadow-md border-border/60",
+
+        // Accent stripe along the top edge
+        highlight: [
+          "bg-card text-card-foreground shadow-md border-border/40",
+          "border-t-2 border-t-primary",
+        ],
+
+        // Subtle surface gradient
+        gradient: [
+          "text-card-foreground shadow-card border-border/40",
+          "bg-gradient-to-b from-surface-raised to-card",
+        ],
+
+        // Clickable card — scale + shadow upgrade on hover
+        interactive: [
+          "bg-card text-card-foreground shadow-md border-border/60",
+          "cursor-pointer hover:scale-[1.01] hover:shadow-lg active:scale-[0.99]",
+        ],
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  },
+)
+
+export interface CardProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof cardVariants> {}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className, variant, ...props }, ref) => (
+    <div
+      ref={ref}
+      className={cn(cardVariants({ variant }), className)}
+      {...props}
+    />
+  ),
+)
 Card.displayName = "Card"
 
 const CardHeader = React.forwardRef<
@@ -35,10 +78,7 @@ const CardTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn(
-      "text-2xl font-semibold leading-none tracking-tight",
-      className
-    )}
+    className={cn("text-2xl font-semibold leading-none tracking-tight", className)}
     {...props}
   />
 ))
@@ -76,4 +116,12 @@ const CardFooter = React.forwardRef<
 ))
 CardFooter.displayName = "CardFooter"
 
-export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  cardVariants,
+}
