@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Check, Zap, Loader2, Lock, ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
+import { Check, Zap, Loader2, Lock, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -93,6 +93,55 @@ const FlagImg = ({ teamName, className }: { teamName: string; className?: string
   if (!src) return null;
   return <img src={src} alt="" className={className} onError={e => { e.currentTarget.style.display = "none"; }} />;
 };
+
+// ── Countdown timer (memoized — ticks never re-render the parent card) ────────
+
+interface MatchCountdownProps {
+  deadlineMs: number;
+}
+
+const MatchCountdown = memo(({ deadlineMs }: MatchCountdownProps) => {
+  const [remaining, setRemaining] = useState(() => deadlineMs - Date.now());
+
+  useEffect(() => {
+    const tick = () => setRemaining(deadlineMs - Date.now());
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [deadlineMs]);
+
+  if (remaining <= 0) return null;
+
+  const totalSecs  = Math.floor(remaining / 1000);
+  const days  = Math.floor(totalSecs / 86400);
+  const hours = Math.floor((totalSecs % 86400) / 3600);
+  const mins  = Math.floor((totalSecs % 3600) / 60);
+  const secs  = totalSecs % 60;
+  const pad   = (n: number) => String(n).padStart(2, "0");
+
+  const isRelaxed   = remaining > 24 * 3600_000;
+  const isAttention = remaining > 3600_000 && remaining <= 24 * 3600_000;
+  const isCrisis    = remaining <= 3600_000;
+
+  const display = isRelaxed
+    ? `${days}d ${pad(hours)}h`
+    : `${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+
+  return (
+    <div className={cn(
+      "flex items-center justify-center gap-1.5 py-1 text-[11px] font-semibold transition-colors",
+      isRelaxed   && "text-muted-foreground/70",
+      isAttention && "bg-amber-500/[0.06] text-amber-400",
+      isCrisis    && "bg-red-500/[0.08] text-red-500 animate-pulse",
+    )}>
+      <Clock className={cn("w-3 h-3 shrink-0", isCrisis && "w-3.5 h-3.5")} />
+      <span className={cn("tabular-nums", isCrisis && "font-black tracking-wide")}>
+        {isCrisis ? "FECHA EM " : "Fecha em "}{display}
+      </span>
+    </div>
+  );
+});
+MatchCountdown.displayName = "MatchCountdown";
 
 // Score +/- control with hold-to-auto-increment
 interface ScoreControlProps {
@@ -432,6 +481,15 @@ const MatchCard = ({
 
   const isComplete = hasScore && winner !== null && advancedFilledCount === 6;
 
+  // Deadline = match start minus the 30-min lock window
+  const deadlineMs = useMemo(() => {
+    if (startsAt) return parseStartMs(startsAt) - 30 * 60_000;
+    if (date) {
+      try { return parseMatchDateTime(date, time).getTime() - 30 * 60_000; } catch { /* skip */ }
+    }
+    return null;
+  }, [startsAt, date, time]);
+
   // ── Auto-fill winner from score ──────────────────────────────────────────────
   useEffect(() => {
     if (isLocked || !hasScore) return;
@@ -635,6 +693,11 @@ const MatchCard = ({
           {resultBadge()}
         </div>
       </div>
+
+      {/* ── Countdown strip — only for open matches with a known deadline ── */}
+      {matchStatus === "open" && deadlineMs !== null && deadlineMs > Date.now() && (
+        <MatchCountdown deadlineMs={deadlineMs} />
+      )}
 
       {/* ── Score section ── */}
       <div className="px-4 pb-3">
