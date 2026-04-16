@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Check, Zap, Loader2, Lock } from "lucide-react";
+import { Check, Zap, Loader2, Lock, ChevronDown, ChevronUp } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -313,13 +313,17 @@ const MatchCard = ({
   const [saved,              setSaved]              = useState(false);
   const [pointsEarned,       setPointsEarned]       = useState<number | null>(null);
 
+  // Advanced section: controlled state (false = closed)
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+
   // Refs
-  const autoWinnerRef    = useRef<"A" | "X" | "B" | null>(null);
-  const advancedRef      = useRef<HTMLDivElement>(null);
-  const prevHasScoreRef  = useRef(false);
-  const prevSaveSignalRef = useRef(0);
+  const autoWinnerRef      = useRef<"A" | "X" | "B" | null>(null);
+  const advancedRef        = useRef<HTMLDivElement>(null);
+  const prevHasScoreRef    = useRef(false);
+  const prevIsCompleteRef  = useRef(false);
+  const prevSaveSignalRef  = useRef(0);
   // handleSave ref to avoid stale closure in saveSignal effect
-  const handleSaveRef    = useRef<() => void>(() => {});
+  const handleSaveRef      = useRef<() => void>(() => {});
 
   const [matchStatus, setMatchStatus] = useState<MatchStatus>(() =>
     computeStatus(startsAt, date, time, scored)
@@ -404,8 +408,8 @@ const MatchCard = ({
   // ── Derived state ────────────────────────────────────────────────────────────
   const hasScore = scoreA !== "" && scoreB !== "";
 
-  // Advanced section always open when score is filled, locked, or saved
-  const advancedOpen = hasScore || hasSavedPrediction || isLocked || matchStatus === "scored";
+  // For locked/scored cards always show advanced fields regardless of state
+  const shouldShowAdvanced = advancedOpen || isLocked || matchStatus === "scored";
 
   // Count of the 6 advanced boolean/choice fields (winner counted separately)
   const advancedFilledCount = [
@@ -444,15 +448,29 @@ const MatchCard = ({
     }
   }, [scoreA, scoreB]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Auto-scroll to advanced fields when score first fills ────────────────────
+  // ── Auto-open + scroll when score first fills (skip if already complete) ─────
   useEffect(() => {
-    if (hasScore && !prevHasScoreRef.current) {
+    if (hasScore && !prevHasScoreRef.current && !isComplete) {
+      setAdvancedOpen(true);
       setTimeout(() => {
         advancedRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }, 300);
     }
     prevHasScoreRef.current = hasScore;
-  }, [hasScore]);
+  }, [hasScore]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-close when all fields become complete ───────────────────────────────
+  useEffect(() => {
+    if (isComplete && !prevIsCompleteRef.current) {
+      // Short delay so the user sees the last field register before closing
+      const t = setTimeout(() => setAdvancedOpen(false), 600);
+      prevIsCompleteRef.current = true;
+      return () => clearTimeout(t);
+    }
+    if (!isComplete) {
+      prevIsCompleteRef.current = false;
+    }
+  }, [isComplete]);
 
   // ── Notify parent of completion change ───────────────────────────────────────
   useEffect(() => {
@@ -814,9 +832,27 @@ const MatchCard = ({
         )}
       </div>
 
-      {/* ── Advanced prediction fields — always visible when score filled ── */}
+      {/* ── Toggle row: shown when complete and section is closed ── */}
       <AnimatePresence>
-        {advancedOpen && (
+        {isComplete && !advancedOpen && matchStatus === "open" && !hasSavedPrediction && (
+          <motion.button
+            type="button"
+            key="review-toggle"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setAdvancedOpen(true)}
+            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors border-t border-border/40"
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+            Revisar campos avançados
+          </motion.button>
+        )}
+      </AnimatePresence>
+
+      {/* ── Advanced prediction fields ── */}
+      <AnimatePresence>
+        {shouldShowAdvanced && (
           <motion.div
             ref={advancedRef}
             initial={{ height: 0, opacity: 0 }}
@@ -832,12 +868,24 @@ const MatchCard = ({
                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">
                     Campos Avançados
                   </span>
-                  <span className={cn(
-                    "text-[11px] font-bold tabular-nums",
-                    advancedFilledCount === 6 ? "text-primary" : "text-muted-foreground",
-                  )}>
-                    {advancedFilledCount}/6
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-[11px] font-bold tabular-nums",
+                      advancedFilledCount === 6 ? "text-primary" : "text-muted-foreground",
+                    )}>
+                      {advancedFilledCount}/6
+                    </span>
+                    {isComplete && (
+                      <button
+                        type="button"
+                        onClick={() => setAdvancedOpen(false)}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Fechar campos avançados"
+                      >
+                        <ChevronUp className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
