@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import MatchCard from "@/components/MatchCard";
 import { phases, fetchMatchesByPhase, groupByDate, type PhaseKey, type MatchData } from "@/data/matches";
 import { useAuth } from "@/hooks/useAuth";
@@ -8,6 +9,7 @@ import { useParticipant } from "@/hooks/useParticipant";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
 function isMatchOpen(match: { startsAt?: string | null; scored?: boolean }): boolean {
   if (match.scored) return false;
@@ -21,6 +23,8 @@ const Matches = () => {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [loading, setLoading] = useState(true);
   const [predictedIds, setPredictedIds] = useState<Set<number>>(new Set());
+  const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
+  const [saveSignal, setSaveSignal] = useState(0);
   const { user } = useAuth();
   const { hasPaid, loading: partLoading } = useParticipant();
   const navigate = useNavigate();
@@ -30,6 +34,7 @@ const Matches = () => {
   useEffect(() => {
     setLoading(true);
     setActiveStage("Todos");
+    setCompletedIds(new Set());
     fetchMatchesByPhase(activePhase).then((data) => {
       setMatches(data);
       setLoading(false);
@@ -70,8 +75,29 @@ const Matches = () => {
   const predictedCount = openMatches.filter(m => predictedIds.has(m.id)).length;
   const totalOpen = openMatches.length;
 
+  // Actionable matches in the current filtered view
+  const actionableIds = useMemo(
+    () => filteredMatches.filter(m => isMatchOpen(m)).map(m => m.id),
+    [filteredMatches],
+  );
+
+  const allComplete = actionableIds.length > 0 && actionableIds.every(id => completedIds.has(id));
+  const allSaved    = actionableIds.length > 0 && actionableIds.every(id => predictedIds.has(id));
+
+  const handleCompletionChange = useCallback((matchId: number, isComplete: boolean) => {
+    setCompletedIds(prev => {
+      const next = new Set(prev);
+      if (isComplete) next.add(matchId); else next.delete(matchId);
+      return next;
+    });
+  }, []);
+
+  const handleSaved = useCallback((matchId: number) => {
+    setPredictedIds(prev => new Set([...prev, matchId]));
+  }, []);
+
   return (
-    <div className="min-h-screen pb-24 pt-4">
+    <div className="min-h-screen pb-40 pt-4">
       <div className="px-4 mb-3">
         <h1 className="text-2xl font-black text-foreground">⚽ Jogos</h1>
         <p className="text-xs text-muted-foreground mt-1">Faça seus palpites para cada partida</p>
@@ -186,6 +212,9 @@ const Matches = () => {
                       {...match}
                       hasPaid={hasPaid}
                       hasSavedPrediction={predictedIds.has(match.id)}
+                      onCompletionChange={handleCompletionChange}
+                      saveSignal={saveSignal}
+                      onSaved={handleSaved}
                     />
                   ))}
                 </div>
@@ -194,6 +223,76 @@ const Matches = () => {
           )}
         </div>
       </div>
+
+      {/* ── Sticky global confirm button ── */}
+      {!loading && actionableIds.length > 0 && (
+        <div className="fixed bottom-20 left-0 right-0 px-4 z-20 pointer-events-none">
+          <AnimatePresence mode="wait">
+            {allSaved ? (
+              <motion.div
+                key="all-saved"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className="flex gap-2 pointer-events-auto"
+              >
+                <div className="flex-1 py-3 rounded-2xl bg-green-500/15 text-green-400 font-bold text-center text-sm border border-green-500/25">
+                  ✓ Palpites Confirmados
+                </div>
+                <button
+                  onClick={() => setPredictedIds(new Set())}
+                  className="px-5 py-3 rounded-2xl border border-border bg-background/90 backdrop-blur text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Alterar
+                </button>
+              </motion.div>
+            ) : allComplete ? (
+              <motion.button
+                key="confirm-all"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                onClick={() => setSaveSignal(Date.now())}
+                whileTap={{ scale: 0.98 }}
+                className="w-full py-4 rounded-2xl btn-gold text-base font-black pointer-events-auto"
+              >
+                ⚡ Confirmar Todos os Palpites
+              </motion.button>
+            ) : (
+              <motion.div
+                key="incomplete"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                className={cn(
+                  "bg-background/90 backdrop-blur border border-border rounded-2xl p-3 flex items-center gap-3 pointer-events-auto",
+                )}
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-muted-foreground">Palpites incompletos</p>
+                  <p className="text-sm font-bold text-foreground tabular-nums">
+                    {completedIds.size}/{actionableIds.length} jogos completos
+                  </p>
+                </div>
+                <div className="shrink-0">
+                  <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary/60 rounded-full transition-all duration-300"
+                      style={{ width: actionableIds.length > 0 ? `${(completedIds.size / actionableIds.length) * 100}%` : "0%" }}
+                    />
+                  </div>
+                </div>
+                <button
+                  disabled
+                  className="px-4 py-2 rounded-xl bg-muted text-muted-foreground text-sm font-bold cursor-not-allowed opacity-50 shrink-0"
+                >
+                  Confirmar
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 };

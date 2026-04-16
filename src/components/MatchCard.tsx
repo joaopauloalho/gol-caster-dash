@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Check, Zap, Loader2, Lock, ChevronDown, ChevronUp } from "lucide-react";
+import { Check, Zap, Loader2, Lock } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -272,6 +272,9 @@ interface MatchCardProps {
   resultPenalty?: boolean | null;
   resultFirstToScore?: string | null;
   resultPossession?: string | null;
+  onCompletionChange?: (id: number, isComplete: boolean) => void;
+  saveSignal?: number;
+  onSaved?: (id: number) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -284,6 +287,7 @@ const MatchCard = ({
   resultGoalFirstHalf = null, resultGoalSecondHalf = null,
   resultRedCard = null, resultPenalty = null,
   resultFirstToScore = null, resultPossession = null,
+  onCompletionChange, saveSignal, onSaved,
 }: MatchCardProps) => {
   const multiplier   = getPhaseMultiplier(stage ?? "Group Stage");
   const localTime    = getLocalTime(date, time);
@@ -294,7 +298,6 @@ const MatchCard = ({
   const navigate     = useNavigate();
 
   // ── State ───────────────────────────────────────────────────────────────────
-  const [expanded,           setExpanded]           = useState(false);
   const [predictionLoaded,   setPredictionLoaded]   = useState(false);
   const [loadingPrediction,  setLoadingPrediction]  = useState(false);
   const [scoreA,             setScoreA]             = useState<number | "">("");
@@ -309,6 +312,14 @@ const MatchCard = ({
   const [hasSavedPrediction, setHasSavedPrediction] = useState(externalHasSaved);
   const [saved,              setSaved]              = useState(false);
   const [pointsEarned,       setPointsEarned]       = useState<number | null>(null);
+
+  // Refs
+  const autoWinnerRef    = useRef<"A" | "X" | "B" | null>(null);
+  const advancedRef      = useRef<HTMLDivElement>(null);
+  const prevHasScoreRef  = useRef(false);
+  const prevSaveSignalRef = useRef(0);
+  // handleSave ref to avoid stale closure in saveSignal effect
+  const handleSaveRef    = useRef<() => void>(() => {});
 
   const [matchStatus, setMatchStatus] = useState<MatchStatus>(() =>
     computeStatus(startsAt, date, time, scored)
@@ -390,10 +401,72 @@ const MatchCard = ({
     if (user) fetchFromServer();
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleToggleExpand = () => {
-    if (!expanded && !predictionLoaded) fetchFromServer();
-    setExpanded(e => !e);
-  };
+  // ── Derived state ────────────────────────────────────────────────────────────
+  const hasScore = scoreA !== "" && scoreB !== "";
+
+  // Advanced section always open when score is filled, locked, or saved
+  const advancedOpen = hasScore || hasSavedPrediction || isLocked || matchStatus === "scored";
+
+  // Count of the 6 advanced boolean/choice fields (winner counted separately)
+  const advancedFilledCount = [
+    goalFirstHalf !== null,
+    goalSecondHalf !== null,
+    redCard !== null,
+    penalty !== null,
+    firstGoal !== null,
+    possession !== null,
+  ].filter(Boolean).length;
+
+  // Full count for potential points display (8 fields total: score pair + winner + 6)
+  const filledCount = [
+    hasScore,
+    winner !== null,
+    goalFirstHalf !== null,
+    goalSecondHalf !== null,
+    redCard !== null,
+    penalty !== null,
+    firstGoal !== null,
+    possession !== null,
+  ].filter(Boolean).length;
+
+  const isComplete = hasScore && winner !== null && advancedFilledCount === 6;
+
+  // ── Auto-fill winner from score ──────────────────────────────────────────────
+  useEffect(() => {
+    if (isLocked || !hasScore) return;
+    const a = scoreA as number;
+    const b = scoreB as number;
+    const computed: "A" | "X" | "B" = a > b ? "A" : b > a ? "B" : "X";
+    // Only auto-update if winner is null or still matches our last auto-set value
+    if (winner === null || winner === autoWinnerRef.current) {
+      autoWinnerRef.current = computed;
+      setWinner(computed);
+    }
+  }, [scoreA, scoreB]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-scroll to advanced fields when score first fills ────────────────────
+  useEffect(() => {
+    if (hasScore && !prevHasScoreRef.current) {
+      setTimeout(() => {
+        advancedRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 300);
+    }
+    prevHasScoreRef.current = hasScore;
+  }, [hasScore]);
+
+  // ── Notify parent of completion change ───────────────────────────────────────
+  useEffect(() => {
+    onCompletionChange?.(id, isComplete);
+  }, [isComplete, id, onCompletionChange]);
+
+  // ── Parent-triggered save ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!saveSignal || saveSignal === prevSaveSignalRef.current) return;
+    prevSaveSignalRef.current = saveSignal;
+    if (isComplete && !hasSavedPrediction && !isLocked) {
+      handleSaveRef.current();
+    }
+  }, [saveSignal, isComplete, hasSavedPrediction, isLocked]);
 
   // ── Field correctness ────────────────────────────────────────────────────────
   const fieldChecks = useMemo(() => {
@@ -407,17 +480,6 @@ const MatchCard = ({
     };
   }, [scored, resultHome, resultAway, resultWinner, resultFirstToScore, resultPossession,
       scoreA, scoreB, winner, firstGoal, possession]);
-
-  const filledCount = [
-    scoreA !== "" && scoreB !== "",
-    winner !== null,
-    goalFirstHalf !== null,
-    goalSecondHalf !== null,
-    redCard !== null,
-    penalty !== null,
-    firstGoal !== null,
-    possession !== null,
-  ].filter(Boolean).length;
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -478,8 +540,12 @@ const MatchCard = ({
 
     setHasSavedPrediction(true);
     setSaved(true);
+    onSaved?.(id);
     setTimeout(() => setSaved(false), 3000);
   };
+
+  // Keep handleSaveRef in sync
+  handleSaveRef.current = handleSave;
 
   // ── Visual state ─────────────────────────────────────────────────────────────
   const isExact   = fieldChecks?.scoreHome && fieldChecks?.scoreAway;
@@ -580,7 +646,7 @@ const MatchCard = ({
       </div>
 
       {/* ── Score section ── */}
-      <div className="px-4 py-3">
+      <div className="px-4 pb-3">
         {/* Scored result row (when pontuado) */}
         {matchStatus === "scored" && resultHome != null && resultAway != null && (
           <div className="flex items-center justify-center gap-2 mb-3 py-2 rounded-xl bg-muted/40 border border-border/40">
@@ -591,40 +657,43 @@ const MatchCard = ({
           </div>
         )}
 
-        {/* Teams + score controls */}
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        {/* Row 1: Teams — each side gets flex-1, no constraint from score controls */}
+        <div className="flex items-center justify-between mb-3">
           {/* Team A */}
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex-1 flex flex-col items-center gap-1 px-1">
             <FlagImg teamName={teamA} className="h-8 rounded shadow-sm" />
-            <span className="text-xs font-bold text-foreground text-center leading-tight break-words hyphens-auto w-full">{teamA}</span>
-            <span className="text-[10px] text-muted-foreground text-center">{teamA.slice(0, 3).toUpperCase()}</span>
+            <span className="text-xs font-bold text-foreground text-center leading-tight w-full">{teamA}</span>
           </div>
 
-          {/* Score controls */}
-          <div className="flex items-center gap-1">
-            <ScoreControl
-              value={scoreA}
-              onChange={setScoreA}
-              disabled={isLocked}
-              isCorrect={fieldChecks?.scoreHome ?? null}
-              isScored={!!scored}
-            />
-            <span className="text-muted-foreground font-bold text-lg mx-0.5">×</span>
-            <ScoreControl
-              value={scoreB}
-              onChange={setScoreB}
-              disabled={isLocked}
-              isCorrect={fieldChecks?.scoreAway ?? null}
-              isScored={!!scored}
-            />
+          {/* VS separator */}
+          <div className="shrink-0 flex flex-col items-center justify-center px-2">
+            <span className="text-[11px] font-black text-muted-foreground/50 tracking-widest">VS</span>
           </div>
 
           {/* Team B */}
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex-1 flex flex-col items-center gap-1 px-1">
             <FlagImg teamName={teamB} className="h-8 rounded shadow-sm" />
-            <span className="text-xs font-bold text-foreground text-center leading-tight break-words hyphens-auto w-full">{teamB}</span>
-            <span className="text-[10px] text-muted-foreground text-center">{teamB.slice(0, 3).toUpperCase()}</span>
+            <span className="text-xs font-bold text-foreground text-center leading-tight w-full">{teamB}</span>
           </div>
+        </div>
+
+        {/* Row 2: Score controls — centered, unconstrained width */}
+        <div className="flex items-center justify-center gap-2">
+          <ScoreControl
+            value={scoreA}
+            onChange={setScoreA}
+            disabled={isLocked}
+            isCorrect={fieldChecks?.scoreHome ?? null}
+            isScored={!!scored}
+          />
+          <span className="text-muted-foreground font-bold text-xl tabular-nums">×</span>
+          <ScoreControl
+            value={scoreB}
+            onChange={setScoreB}
+            disabled={isLocked}
+            isCorrect={fieldChecks?.scoreAway ?? null}
+            isScored={!!scored}
+          />
         </div>
       </div>
 
@@ -669,23 +738,7 @@ const MatchCard = ({
 
         {matchStatus === "open" && (
           <>
-            {/* Progress bar — shown when filling advanced fields */}
-            {filledCount > 0 && filledCount < 8 && !hasSavedPrediction && !saved && (
-              <div className="space-y-1">
-                <div className="flex justify-between text-[10px] text-muted-foreground font-medium px-0.5">
-                  <span>Campos avançados</span>
-                  <span className="tabular-nums">{filledCount}/8</span>
-                </div>
-                <div className="h-1 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full bg-primary/60 rounded-full transition-all duration-300"
-                    style={{ width: `${(filledCount / 8) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* State 3 — Saved (3s flash) */}
+            {/* State: saved 3s flash */}
             {saved ? (
               <motion.div
                 initial={{ opacity: 0, y: 4 }}
@@ -695,7 +748,7 @@ const MatchCard = ({
                 <Check className="w-4 h-4" /> Palpite Salvo!
               </motion.div>
             ) : hasSavedPrediction ? (
-              /* State 3 — Confirmed: two-button row */
+              /* State: confirmed */
               <div className="flex gap-2">
                 <div className="flex-1 py-3 rounded-xl bg-green-500/20 text-green-400 border border-green-500/25 text-sm font-bold flex items-center justify-center gap-2">
                   <Check className="w-4 h-4" /> Confirmado
@@ -726,30 +779,32 @@ const MatchCard = ({
                 </AlertDialog>
               </div>
             ) : (
-              /* State 1 (scores empty — disabled) or State 2 (scores filled — gold) */
+              /* State: disabled / filling / complete */
               <motion.button
                 type="button"
                 onClick={handleSave}
-                disabled={isLocked || scoreA === "" || scoreB === ""}
-                whileTap={(scoreA !== "" && scoreB !== "") ? { scale: 0.98 } : undefined}
+                disabled={!isComplete}
+                whileTap={isComplete ? { scale: 0.98 } : undefined}
                 className={cn(
                   "w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
-                  (scoreA !== "" && scoreB !== "")
-                    ? filledCount === 8
-                      ? "btn-gold animate-pulse-gold"
-                      : "btn-gold"
+                  isComplete
+                    ? "btn-gold animate-pulse-gold"
                     : "bg-muted/40 text-muted-foreground/40 cursor-not-allowed border border-border/30",
                 )}
               >
                 <AnimatePresence mode="wait">
-                  {(scoreA !== "" && scoreB !== "") ? (
-                    <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                  {isComplete ? (
+                    <motion.span key="complete" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
                       <Zap className="w-4 h-4" /> Confirmar Palpite
-                      {filledCount === 8 && <span className="text-[10px] opacity-70">8/8 ✓</span>}
+                    </motion.span>
+                  ) : !hasScore ? (
+                    <motion.span key="noscore" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 opacity-40" /> Preencha o placar para continuar
                     </motion.span>
                   ) : (
-                    <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                      <Zap className="w-4 h-4" /> Preencha o placar para continuar
+                    <motion.span key="partial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                      <Zap className="w-4 h-4 opacity-40" />
+                      {advancedFilledCount}/6 campos avançados preenchidos
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -757,147 +812,150 @@ const MatchCard = ({
             )}
           </>
         )}
-
-        {/* Completeness hint — only while editing */}
-        {filledCount > 0 && matchStatus === "open" && !hasSavedPrediction && !saved && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-            <span>Campos preenchidos</span>
-            <span className={cn(
-              "font-bold tabular-nums",
-              filledCount === 8 ? "text-primary" : "text-muted-foreground",
-            )}>{filledCount}/8</span>
-          </div>
-        )}
       </div>
 
-      {/* ── Expandable: advanced prediction fields ── */}
-      <button
-        type="button"
-        onClick={handleToggleExpand}
-        className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors border-t border-border/40"
-      >
-        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        {expanded ? "Fechar campos avançados" : `Campos avançados (vencedor, gols…)`}
-      </button>
-
+      {/* ── Advanced prediction fields — always visible when score filled ── */}
       <AnimatePresence>
-        {expanded && (
+        {advancedOpen && (
           <motion.div
+            ref={advancedRef}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
             className="overflow-hidden"
           >
-            <div className="px-4 pb-4 space-y-3 border-t border-border/40 pt-3">
-
-              {loadingPrediction && (
-                <div className="flex items-center justify-center gap-2 py-3 text-muted-foreground text-xs">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+            <div className="border-t border-border/40">
+              {/* Section header with progress */}
+              {matchStatus === "open" && !hasSavedPrediction && (
+                <div className="flex items-center justify-between px-4 pt-3 pb-1">
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">
+                    Campos Avançados
+                  </span>
+                  <span className={cn(
+                    "text-[11px] font-bold tabular-nums",
+                    advancedFilledCount === 6 ? "text-primary" : "text-muted-foreground",
+                  )}>
+                    {advancedFilledCount}/6
+                  </span>
                 </div>
               )}
 
-              <div className={loadingPrediction ? "hidden" : "space-y-3"}>
-                {/* Vencedor */}
-                <div>
-                  <label className={cn(
-                    "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
-                    fieldChecks?.winner ? "text-green-400" : "text-muted-foreground",
-                  )}>
-                    Vencedor / Empate <span className="text-primary">(10 pts)</span>
-                    {fieldChecks?.winner && <Check className="w-3.5 h-3.5" />}
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {([
-                      { key: "A" as const, label: teamA },
-                      { key: "X" as const, label: "Empate" },
-                      { key: "B" as const, label: teamB },
-                    ]).map(({ key, label }) => {
-                      const isSelected = winner === key;
-                      const isCorrect  = scored && resultWinner != null ? key === resultWinner : null;
-                      return (
-                        <button key={key} type="button" disabled={isLocked}
-                          onClick={() => !isLocked && setWinner(winner === key ? null : key)}
-                          className={choiceButtonClass(isSelected, isCorrect)}
-                        >{label}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Toggles */}
-                <div className="grid grid-cols-2 gap-3">
-                  <ToggleField label="Gol no 1º Tempo"  pointsSim={5}  pointsNao={5}
-                    value={goalFirstHalf}  onChange={setGoalFirstHalf}  disabled={isLocked}
-                    resultValue={scored ? resultGoalFirstHalf : undefined} />
-                  <ToggleField label="Gol no 2º Tempo"  pointsSim={5}  pointsNao={5}
-                    value={goalSecondHalf} onChange={setGoalSecondHalf} disabled={isLocked}
-                    resultValue={scored ? resultGoalSecondHalf : undefined} />
-                  <ToggleField label="Terá Expulsão?"   pointsSim={12} pointsNao={5}
-                    value={redCard}        onChange={setRedCard}        disabled={isLocked}
-                    resultValue={scored ? resultRedCard : undefined} />
-                  <ToggleField label="Terá Pênalti?"    pointsSim={12} pointsNao={5}
-                    value={penalty}        onChange={setPenalty}        disabled={isLocked}
-                    resultValue={scored ? resultPenalty : undefined} />
-                </div>
-
-                {/* 1º a marcar */}
-                <div>
-                  <label className={cn(
-                    "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
-                    fieldChecks?.firstGoal ? "text-green-400" : "text-muted-foreground",
-                  )}>
-                    Quem marca 1º? <span className="text-primary">(8 pts)</span>
-                    {fieldChecks?.firstGoal && <Check className="w-3.5 h-3.5" />}
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {([
-                      { key: "A" as const, label: teamA },
-                      { key: "N" as const, label: "Ninguém" },
-                      { key: "B" as const, label: teamB },
-                    ]).map(({ key, label }) => {
-                      const isSelected = firstGoal === key;
-                      const isCorrect  = scored && resultFirstToScore != null ? key === resultFirstToScore : null;
-                      return (
-                        <button key={key} type="button" disabled={isLocked}
-                          onClick={() => !isLocked && setFirstGoal(firstGoal === key ? null : key)}
-                          className={altChoiceClass(isSelected, isCorrect)}
-                        >{label}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Posse */}
-                <div>
-                  <label className={cn(
-                    "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
-                    fieldChecks?.possession ? "text-green-400" : "text-muted-foreground",
-                  )}>
-                    Mais Posse de Bola <span className="text-primary">(5 pts)</span>
-                    {fieldChecks?.possession && <Check className="w-3.5 h-3.5" />}
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {([{ key: "A" as const, label: teamA }, { key: "B" as const, label: teamB }]).map(({ key, label }) => {
-                      const isSelected = possession === key;
-                      const isCorrect  = scored && resultPossession != null ? key === resultPossession : null;
-                      return (
-                        <button key={key} type="button" disabled={isLocked}
-                          onClick={() => !isLocked && setPossession(possession === key ? null : key)}
-                          className={altChoiceClass(isSelected, isCorrect)}
-                        >{label}</button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Gabarito perfeito hint */}
-                {filledCount === 8 && matchStatus === "open" && (
-                  <div className="text-center text-xs text-primary font-semibold p-2 rounded-xl bg-glass-gold">
-                    🏆 Palpite completo — Potencial: até {MAX_BASE_POINTS * multiplier} pts
-                    {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier} fase)</span>}
+              <div className="px-4 pb-4 space-y-3 pt-3">
+                {loadingPrediction && (
+                  <div className="flex items-center justify-center gap-2 py-3 text-muted-foreground text-xs">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
                   </div>
                 )}
+
+                <div className={loadingPrediction ? "hidden" : "space-y-3"}>
+                  {/* Vencedor */}
+                  <div>
+                    <label className={cn(
+                      "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
+                      fieldChecks?.winner ? "text-green-400" : "text-muted-foreground",
+                    )}>
+                      Vencedor / Empate <span className="text-primary">(10 pts)</span>
+                      {fieldChecks?.winner && <Check className="w-3.5 h-3.5" />}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { key: "A" as const, label: teamA },
+                        { key: "X" as const, label: "Empate" },
+                        { key: "B" as const, label: teamB },
+                      ]).map(({ key, label }) => {
+                        const isSelected = winner === key;
+                        const isCrt  = scored && resultWinner != null ? key === resultWinner : null;
+                        return (
+                          <button key={key} type="button" disabled={isLocked}
+                            onClick={() => {
+                              if (isLocked) return;
+                              const next = winner === key ? null : key;
+                              // User manually overriding — clear auto-tracking
+                              autoWinnerRef.current = null;
+                              setWinner(next);
+                            }}
+                            className={choiceButtonClass(isSelected, isCrt)}
+                          >{label}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Toggles */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <ToggleField label="Gol no 1º Tempo"  pointsSim={5}  pointsNao={5}
+                      value={goalFirstHalf}  onChange={setGoalFirstHalf}  disabled={isLocked}
+                      resultValue={scored ? resultGoalFirstHalf : undefined} />
+                    <ToggleField label="Gol no 2º Tempo"  pointsSim={5}  pointsNao={5}
+                      value={goalSecondHalf} onChange={setGoalSecondHalf} disabled={isLocked}
+                      resultValue={scored ? resultGoalSecondHalf : undefined} />
+                    <ToggleField label="Terá Expulsão?"   pointsSim={12} pointsNao={5}
+                      value={redCard}        onChange={setRedCard}        disabled={isLocked}
+                      resultValue={scored ? resultRedCard : undefined} />
+                    <ToggleField label="Terá Pênalti?"    pointsSim={12} pointsNao={5}
+                      value={penalty}        onChange={setPenalty}        disabled={isLocked}
+                      resultValue={scored ? resultPenalty : undefined} />
+                  </div>
+
+                  {/* 1º a marcar */}
+                  <div>
+                    <label className={cn(
+                      "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
+                      fieldChecks?.firstGoal ? "text-green-400" : "text-muted-foreground",
+                    )}>
+                      Quem marca 1º? <span className="text-primary">(8 pts)</span>
+                      {fieldChecks?.firstGoal && <Check className="w-3.5 h-3.5" />}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { key: "A" as const, label: teamA },
+                        { key: "N" as const, label: "Ninguém" },
+                        { key: "B" as const, label: teamB },
+                      ]).map(({ key, label }) => {
+                        const isSelected = firstGoal === key;
+                        const isCrt  = scored && resultFirstToScore != null ? key === resultFirstToScore : null;
+                        return (
+                          <button key={key} type="button" disabled={isLocked}
+                            onClick={() => !isLocked && setFirstGoal(firstGoal === key ? null : key)}
+                            className={altChoiceClass(isSelected, isCrt)}
+                          >{label}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Posse */}
+                  <div>
+                    <label className={cn(
+                      "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
+                      fieldChecks?.possession ? "text-green-400" : "text-muted-foreground",
+                    )}>
+                      Mais Posse de Bola <span className="text-primary">(5 pts)</span>
+                      {fieldChecks?.possession && <Check className="w-3.5 h-3.5" />}
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([{ key: "A" as const, label: teamA }, { key: "B" as const, label: teamB }]).map(({ key, label }) => {
+                        const isSelected = possession === key;
+                        const isCrt  = scored && resultPossession != null ? key === resultPossession : null;
+                        return (
+                          <button key={key} type="button" disabled={isLocked}
+                            onClick={() => !isLocked && setPossession(possession === key ? null : key)}
+                            className={altChoiceClass(isSelected, isCrt)}
+                          >{label}</button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Gabarito perfeito hint */}
+                  {filledCount === 8 && matchStatus === "open" && (
+                    <div className="text-center text-xs text-primary font-semibold p-2 rounded-xl bg-glass-gold">
+                      🏆 Palpite completo — Potencial: até {MAX_BASE_POINTS * multiplier} pts
+                      {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier} fase)</span>}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </motion.div>
