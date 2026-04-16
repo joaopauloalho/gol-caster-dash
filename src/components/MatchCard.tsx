@@ -7,6 +7,12 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { getPhaseMultiplier, parseMatchDateTime } from "@/data/matches";
 import { MAX_BASE_POINTS } from "@/lib/scoring";
 import { cn } from "@/lib/utils";
@@ -91,7 +97,7 @@ const FlagImg = ({ teamName, className }: { teamName: string; className?: string
 // Score +/- control with hold-to-auto-increment
 interface ScoreControlProps {
   value: number | "";
-  onChange: (v: number) => void;
+  onChange: (v: number | "") => void;
   disabled?: boolean;
   isCorrect?: boolean | null;
   isScored?: boolean;
@@ -120,22 +126,26 @@ const ScoreControl = ({ value, onChange, disabled, isCorrect, isScored }: ScoreC
 
   useEffect(() => () => stopHold(), []);
 
-  const isEmpty  = value === "";
-  const numClass = cn(
-    "w-9 text-center font-mono text-2xl font-black tabular-nums select-none",
-    isEmpty
-      ? "text-muted-foreground/40"
-      : isScored
-        ? isCorrect
-          ? "text-green-400"
-          : "text-muted-foreground/50"
-        : "text-foreground",
-  );
+  const isEmpty = value === "";
 
   const btnClass = cn(
     "w-11 h-11 rounded-xl flex items-center justify-center font-bold text-xl",
     "bg-muted text-muted-foreground transition-all active:scale-95 select-none",
     disabled ? "opacity-30 cursor-not-allowed" : "hover:bg-muted/70 hover:text-foreground",
+  );
+
+  const inputClass = cn(
+    "w-12 h-12 text-center font-mono text-2xl font-black tabular-nums rounded-xl border-2",
+    "bg-background focus:ring-0 focus:outline-none transition-all",
+    "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+    isEmpty
+      ? "border-border/50 text-muted-foreground/40"
+      : isScored
+        ? isCorrect
+          ? "border-green-500/40 text-green-400"
+          : "border-border/30 text-muted-foreground/50"
+        : "border-primary/40 text-foreground focus:border-primary",
+    disabled ? "opacity-40 cursor-not-allowed" : "",
   );
 
   return (
@@ -149,7 +159,26 @@ const ScoreControl = ({ value, onChange, disabled, isCorrect, isScored }: ScoreC
         aria-label="Diminuir"
         className={btnClass}
       >−</button>
-      <span className={numClass}>{isEmpty ? "—" : numVal}</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        min={0}
+        max={99}
+        value={isEmpty ? "" : String(value)}
+        onChange={e => {
+          if (disabled) return;
+          const v = e.target.value;
+          if (v === "") { onChange(""); return; }
+          const n = parseInt(v, 10);
+          if (!isNaN(n) && n >= 0 && n <= 20) onChange(n);
+        }}
+        onFocus={e => e.target.select()}
+        disabled={disabled}
+        placeholder="—"
+        aria-label="Placar"
+        className={inputClass}
+      />
       <button
         type="button"
         onPointerDown={() => startHold(increment)}
@@ -563,15 +592,16 @@ const MatchCard = ({
         )}
 
         {/* Teams + score controls */}
-        <div className="flex items-center justify-between gap-2">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           {/* Team A */}
-          <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+          <div className="flex flex-col items-center gap-1">
             <FlagImg teamName={teamA} className="h-8 rounded shadow-sm" />
-            <span className="text-xs font-bold text-foreground text-center leading-tight break-words hyphens-auto w-full line-clamp-2">{teamA}</span>
+            <span className="text-xs font-bold text-foreground text-center leading-tight break-words hyphens-auto w-full">{teamA}</span>
+            <span className="text-[10px] text-muted-foreground text-center">{teamA.slice(0, 3).toUpperCase()}</span>
           </div>
 
           {/* Score controls */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1">
             <ScoreControl
               value={scoreA}
               onChange={setScoreA}
@@ -590,9 +620,10 @@ const MatchCard = ({
           </div>
 
           {/* Team B */}
-          <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
+          <div className="flex flex-col items-center gap-1">
             <FlagImg teamName={teamB} className="h-8 rounded shadow-sm" />
-            <span className="text-xs font-bold text-foreground text-center leading-tight break-words hyphens-auto w-full line-clamp-2">{teamB}</span>
+            <span className="text-xs font-bold text-foreground text-center leading-tight break-words hyphens-auto w-full">{teamB}</span>
+            <span className="text-[10px] text-muted-foreground text-center">{teamB.slice(0, 3).toUpperCase()}</span>
           </div>
         </div>
       </div>
@@ -638,11 +669,11 @@ const MatchCard = ({
 
         {matchStatus === "open" && (
           <>
-            {/* Progress bar — shown when partially filled */}
-            {filledCount > 0 && filledCount < 8 && (
+            {/* Progress bar — shown when filling advanced fields */}
+            {filledCount > 0 && filledCount < 8 && !hasSavedPrediction && !saved && (
               <div className="space-y-1">
                 <div className="flex justify-between text-[10px] text-muted-foreground font-medium px-0.5">
-                  <span>Palpite incompleto</span>
+                  <span>Campos avançados</span>
                   <span className="tabular-nums">{filledCount}/8</span>
                 </div>
                 <div className="h-1 rounded-full bg-muted overflow-hidden">
@@ -654,50 +685,81 @@ const MatchCard = ({
               </div>
             )}
 
-            <motion.button
-              type="button"
-              onClick={handleSave}
-              disabled={isLocked || filledCount === 0}
-              whileTap={filledCount > 0 ? { scale: 0.98 } : undefined}
-              className={cn(
-                "w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
-                saved
-                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                  : (hasSavedPrediction && !saved)
-                    ? "bg-muted/60 text-muted-foreground border border-border/50"
-                    : filledCount === 8
+            {/* State 3 — Saved (3s flash) */}
+            {saved ? (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="w-full py-3 rounded-xl bg-green-500/20 text-green-400 border border-green-500/25 text-sm font-bold flex items-center justify-center gap-2"
+              >
+                <Check className="w-4 h-4" /> Palpite Salvo!
+              </motion.div>
+            ) : hasSavedPrediction ? (
+              /* State 3 — Confirmed: two-button row */
+              <div className="flex gap-2">
+                <div className="flex-1 py-3 rounded-xl bg-green-500/20 text-green-400 border border-green-500/25 text-sm font-bold flex items-center justify-center gap-2">
+                  <Check className="w-4 h-4" /> Confirmado
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="px-4 py-3 rounded-xl border border-border/50 bg-muted/40 text-muted-foreground text-sm font-bold hover:bg-muted transition-colors"
+                    >
+                      Alterar
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Alterar palpite?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Seus dados serão mantidos — mas você precisará confirmar novamente.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => setHasSavedPrediction(false)}>
+                        Alterar
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ) : (
+              /* State 1 (scores empty — disabled) or State 2 (scores filled — gold) */
+              <motion.button
+                type="button"
+                onClick={handleSave}
+                disabled={isLocked || scoreA === "" || scoreB === ""}
+                whileTap={(scoreA !== "" && scoreB !== "") ? { scale: 0.98 } : undefined}
+                className={cn(
+                  "w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
+                  (scoreA !== "" && scoreB !== "")
+                    ? filledCount === 8
                       ? "btn-gold animate-pulse-gold"
-                      : filledCount > 0
-                        ? "btn-gold"
-                        : "bg-muted/40 text-muted-foreground/40 cursor-not-allowed border border-border/30",
-              )}
-            >
-              <AnimatePresence mode="wait">
-                {saved ? (
-                  <motion.span key="saved" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                    <Check className="w-4 h-4" /> Palpite Salvo!
-                  </motion.span>
-                ) : hasSavedPrediction ? (
-                  <motion.span key="update" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                    <Zap className="w-4 h-4" /> Alterar Palpite
-                  </motion.span>
-                ) : filledCount === 0 ? (
-                  <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                    <Zap className="w-4 h-4" /> Use − + para palpitar
-                  </motion.span>
-                ) : (
-                  <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
-                    <Zap className="w-4 h-4" /> Confirmar Palpite
-                    {filledCount === 8 && <span className="text-[10px] opacity-70">8/8 ✓</span>}
-                  </motion.span>
+                      : "btn-gold"
+                    : "bg-muted/40 text-muted-foreground/40 cursor-not-allowed border border-border/30",
                 )}
-              </AnimatePresence>
-            </motion.button>
+              >
+                <AnimatePresence mode="wait">
+                  {(scoreA !== "" && scoreB !== "") ? (
+                    <motion.span key="save" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                      <Zap className="w-4 h-4" /> Confirmar Palpite
+                      {filledCount === 8 && <span className="text-[10px] opacity-70">8/8 ✓</span>}
+                    </motion.span>
+                  ) : (
+                    <motion.span key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                      <Zap className="w-4 h-4" /> Preencha o placar para continuar
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </motion.button>
+            )}
           </>
         )}
 
-        {/* Completeness hint */}
-        {filledCount > 0 && matchStatus === "open" && (
+        {/* Completeness hint — only while editing */}
+        {filledCount > 0 && matchStatus === "open" && !hasSavedPrediction && !saved && (
           <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
             <span>Campos preenchidos</span>
             <span className={cn(

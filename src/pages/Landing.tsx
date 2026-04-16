@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Trophy, Zap, ChevronRight, Users, Gift,
-  Lock, Crown, Target, Eye, MapPin, Map, Globe, Swords, Star, Shield, Check,
+  Lock, Crown, Target, Eye, MapPin, Map, Globe, Swords, Star, Shield, Check, Pencil,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { RetroGrid } from "@/components/ui/retro-grid";
 import { Marquee } from "@/components/ui/marquee";
 import { ShinyButton } from "@/components/ui/shiny-button";
 import { NumberTicker } from "@/components/ui/number-ticker";
@@ -13,6 +12,48 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import OnboardingWizard from "@/components/OnboardingWizard";
+
+// ── Football field background ─────────────────────────────────────────────────
+
+const FootballField = () => (
+  <svg
+    className="absolute inset-0 w-full h-full pointer-events-none select-none"
+    viewBox="0 0 400 700"
+    preserveAspectRatio="xMidYMid slice"
+    aria-hidden="true"
+    style={{ color: "rgba(255,255,255,0.055)" }}
+  >
+    {/* Outer pitch */}
+    <rect x="30" y="30" width="340" height="640" fill="none" stroke="currentColor" strokeWidth="2" />
+    {/* Halfway line */}
+    <line x1="30" y1="350" x2="370" y2="350" stroke="currentColor" strokeWidth="1.5" />
+    {/* Centre circle */}
+    <circle cx="200" cy="350" r="70" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    {/* Centre spot */}
+    <circle cx="200" cy="350" r="4" fill="currentColor" />
+    {/* Top penalty area */}
+    <rect x="105" y="30" width="190" height="95" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    {/* Top goal area */}
+    <rect x="150" y="30" width="100" height="42" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    {/* Top penalty spot */}
+    <circle cx="200" cy="155" r="4" fill="currentColor" />
+    {/* Top penalty arc */}
+    <path d="M 130 125 A 75 75 0 0 1 270 125" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    {/* Bottom penalty area */}
+    <rect x="105" y="575" width="190" height="95" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    {/* Bottom goal area */}
+    <rect x="150" y="628" width="100" height="42" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    {/* Bottom penalty spot */}
+    <circle cx="200" cy="545" r="4" fill="currentColor" />
+    {/* Bottom penalty arc */}
+    <path d="M 130 575 A 75 75 0 0 0 270 575" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    {/* Corner arcs */}
+    <path d="M 30 50 A 18 18 0 0 1 50 30" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M 370 50 A 18 18 0 0 0 350 30" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M 30 650 A 18 18 0 0 0 50 670" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    <path d="M 370 650 A 18 18 0 0 1 350 670" fill="none" stroke="currentColor" strokeWidth="1.5" />
+  </svg>
+);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -374,9 +415,9 @@ const Landing = () => {
         className="relative overflow-hidden min-h-[100dvh] flex flex-col items-center justify-center px-4 py-24"
         style={{ background: "var(--gradient-hero)" }}
       >
-        <RetroGrid className="opacity-25" />
+        <FootballField />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-[500px] h-[500px] rounded-full bg-primary/8 blur-[120px]" />
+          <div className="w-[600px] h-[600px] rounded-full bg-primary/10 blur-[140px]" />
         </div>
 
         <div className="relative z-10 max-w-lg mx-auto text-center space-y-7">
@@ -503,7 +544,7 @@ const Landing = () => {
       </div>
 
       {/* ── Como funciona ── */}
-      <section id="como-funciona" className="px-4 py-20 max-w-lg mx-auto scroll-mt-20">
+      <section id="como-funciona" className="px-4 py-20 max-w-2xl mx-auto scroll-mt-20">
         <FadeUp className="text-center mb-10">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border badge-gold text-xs font-bold mb-4">
             <Zap className="w-3 h-3" /> Como funciona
@@ -512,20 +553,27 @@ const Landing = () => {
           <p className="text-sm text-muted-foreground mt-2">Três passos. Um único destino: o topo.</p>
         </FadeUp>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {[
-            { step: "01", icon: Target, title: "Dê seu Palpite", desc: "Escolha os placares dos 104 jogos da Copa do Mundo. Quanto mais preciso, mais pontos você acumula.", delay: 0 },
-            { step: "02", icon: Star,   title: "Acumule Pontos",  desc: "Cada acerto te lança para o topo do ranking — local, estadual e nacional.", delay: 1 },
-            { step: "03", icon: Trophy, title: "Suba e Ganhe",    desc: "Seja o premiado do jogo, da rodada ou do dia. Pix, prêmios físicos e a grande bolada da final.", delay: 2 },
+            { step: "01", icon: Pencil, title: "Palpite nos 8 jogos", desc: "Antes do prazo, informe o placar de cada partida da rodada. Cada campo extra vale pontos.", delay: 0 },
+            { step: "02", icon: Zap,    title: "Ganhe pontos",         desc: "Vencedor certo, placar exato, saldo de gols — acumule pontos por precisão a cada jogo.", delay: 1 },
+            { step: "03", icon: Trophy, title: "Suba no ranking",      desc: "Compare com amigos, cidade e o Brasil todo. Quem mais entende de futebol?", delay: 2 },
           ].map(({ step, icon: Icon, title, desc, delay }) => (
             <FadeUp key={step} delay={delay}>
-              <div className="flex gap-5 items-start p-5 rounded-2xl border border-border/60 bg-card/40 hover:bg-card/60 transition-colors">
-                <div className="w-14 h-14 rounded-2xl flex flex-col items-center justify-center flex-shrink-0 border border-primary/[0.3] bg-primary/[0.12]">
+              <div className="relative flex flex-col gap-4 p-6 rounded-2xl border border-border/60 bg-card/40 hover:bg-card/60 transition-colors overflow-hidden h-full">
+                {/* Decorative step number */}
+                <span
+                  className="absolute -bottom-3 -right-1 text-8xl font-black leading-none select-none pointer-events-none"
+                  style={{ color: "hsl(var(--color-primary) / 0.07)" }}
+                >
+                  {step}
+                </span>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 border border-primary/[0.3] bg-primary/[0.12]">
                   <Icon className="w-5 h-5 text-primary" />
-                  <span className="text-[9px] font-black mt-0.5 text-primary">{step}</span>
                 </div>
                 <div>
-                  <h3 className="font-black text-base text-foreground mb-1">{title}</h3>
+                  <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">{step}</p>
+                  <h3 className="font-black text-base text-foreground mb-1.5">{title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
                 </div>
               </div>
