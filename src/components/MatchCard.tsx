@@ -318,9 +318,6 @@ const MatchCard = ({
 
   // Refs
   const autoWinnerRef      = useRef<"A" | "X" | "B" | null>(null);
-  const advancedRef        = useRef<HTMLDivElement>(null);
-  const prevHasScoreRef    = useRef(false);
-  const prevIsCompleteRef  = useRef(false);
   const prevSaveSignalRef  = useRef(0);
   // handleSave ref to avoid stale closure in saveSignal effect
   const handleSaveRef      = useRef<() => void>(() => {});
@@ -447,30 +444,6 @@ const MatchCard = ({
       setWinner(computed);
     }
   }, [scoreA, scoreB]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Auto-open + scroll when score first fills (skip if already complete) ─────
-  useEffect(() => {
-    if (hasScore && !prevHasScoreRef.current && !isComplete) {
-      setAdvancedOpen(true);
-      setTimeout(() => {
-        advancedRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      }, 300);
-    }
-    prevHasScoreRef.current = hasScore;
-  }, [hasScore]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Auto-close when all fields become complete ───────────────────────────────
-  useEffect(() => {
-    if (isComplete && !prevIsCompleteRef.current) {
-      // Short delay so the user sees the last field register before closing
-      const t = setTimeout(() => setAdvancedOpen(false), 600);
-      prevIsCompleteRef.current = true;
-      return () => clearTimeout(t);
-    }
-    if (!isComplete) {
-      prevIsCompleteRef.current = false;
-    }
-  }, [isComplete]);
 
   // ── Notify parent of completion change ───────────────────────────────────────
   useEffect(() => {
@@ -832,29 +805,22 @@ const MatchCard = ({
         )}
       </div>
 
-      {/* ── Toggle row: shown when complete and section is closed ── */}
-      <AnimatePresence>
-        {isComplete && !advancedOpen && matchStatus === "open" && !hasSavedPrediction && (
-          <motion.button
-            type="button"
-            key="review-toggle"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setAdvancedOpen(true)}
-            className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors border-t border-border/40"
-          >
-            <ChevronDown className="w-3.5 h-3.5" />
-            Revisar campos avançados
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* ── Toggle button — visible in all card states ── */}
+      <button
+        type="button"
+        onClick={() => setAdvancedOpen(o => !o)}
+        className="w-full flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors border-t border-border/40"
+      >
+        {advancedOpen
+          ? <><ChevronUp className="w-3.5 h-3.5" /> Fechar campos avançados</>
+          : <><ChevronDown className="w-3.5 h-3.5" /> Ver campos avançados</>
+        }
+      </button>
 
       {/* ── Advanced prediction fields ── */}
       <AnimatePresence>
-        {shouldShowAdvanced && (
+        {advancedOpen && (
           <motion.div
-            ref={advancedRef}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -868,24 +834,12 @@ const MatchCard = ({
                   <span className="text-[10px] font-black text-muted-foreground uppercase tracking-wider">
                     Campos Avançados
                   </span>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-[11px] font-bold tabular-nums",
-                      advancedFilledCount === 6 ? "text-primary" : "text-muted-foreground",
-                    )}>
-                      {advancedFilledCount}/6
-                    </span>
-                    {isComplete && (
-                      <button
-                        type="button"
-                        onClick={() => setAdvancedOpen(false)}
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                        aria-label="Fechar campos avançados"
-                      >
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
+                  <span className={cn(
+                    "text-[11px] font-bold tabular-nums",
+                    advancedFilledCount === 6 ? "text-primary" : "text-muted-foreground",
+                  )}>
+                    {advancedFilledCount}/6
+                  </span>
                 </div>
               )}
 
