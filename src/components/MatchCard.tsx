@@ -569,7 +569,6 @@ const MatchCard = ({
       has_penalty:       penalty,
       first_to_score:    firstGoal,
       possession_winner: possession,
-      points_earned:     0,
       updated_at:        new Date().toISOString(),
     }, { onConflict: "user_id,match_id" });
 

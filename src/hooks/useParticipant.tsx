@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
@@ -20,26 +20,36 @@ export const useParticipant = () => {
   const { user } = useAuth();
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchParticipant = useCallback(async () => {
     if (!user) {
       setParticipant(null);
       setLoading(false);
       return;
     }
 
-    const fetch = async () => {
-      const { data } = await supabase
-        .from("participants")
-        .select("id, full_name, username, payment_confirmed, is_test_user, plan, state, city, referral_code, bonus_points, favorite_team")
-        .eq("user_id", user.id)
-        .maybeSingle();
+    setLoading(true);
+    setError(null);
+
+    const { data, error: queryError } = await supabase
+      .from("participants")
+      .select("id, full_name, username, payment_confirmed, is_test_user, plan, state, city, referral_code, bonus_points, favorite_team")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (queryError) {
+      setError(queryError.message);
+    } else {
       setParticipant(data as Participant | null);
-      setLoading(false);
-    };
-    fetch();
+    }
+    setLoading(false);
   }, [user]);
 
+  useEffect(() => {
+    fetchParticipant();
+  }, [fetchParticipant]);
+
   const hasPaid = (participant?.payment_confirmed || participant?.is_test_user) ?? false;
-  return { participant, loading, hasPaid };
+  return { participant, loading, hasPaid, error, refetch: fetchParticipant };
 };
