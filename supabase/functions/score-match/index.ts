@@ -29,7 +29,7 @@ const MULTIPLIERS: Record<string, number> = {
   "Round of 16": 2, "Oitavas": 2,
   "Quarter-finals": 3, "Quartas": 3,
   "Semi-finals": 4, "Semis": 4,
-  "Final": 5,
+  "Final": 5, "Third Place": 5,
 };
 
 function getMultiplier(stage: string): number {

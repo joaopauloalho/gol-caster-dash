@@ -33,10 +33,10 @@ export const PHASE_MULTIPLIERS: Record<PhaseKey, number> = {
   Brasileirão: 1,
   Grupos: 1,
   "32avos": 2,
-  Oitavas: 3,
-  Quartas: 5,
-  Semis: 7,
-  Final: 10,
+  Oitavas: 2,
+  Quartas: 3,
+  Semis: 4,
+  Final: 5,
 };
 
 // Converte date (DD/MM/YYYY) + time (HH:mm) em Brasília para um Date UTC
@@ -57,7 +57,9 @@ function stageToPhase(stage: string): PhaseKey {
   if (stage === "Round of 16") return "Oitavas";
   if (stage === "Quarter-finals") return "Quartas";
   if (stage === "Semi-finals") return "Semis";
-  return "Final";
+  if (stage === "Third Place") return "Final";
+  console.warn(`[stageToPhase] unknown stage: "${stage}" — defaulting to Grupos (1×)`);
+  return "Grupos";
 }
 
 export interface MatchDay {
