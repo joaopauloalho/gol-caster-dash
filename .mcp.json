@@ -3,6 +3,13 @@
     "shadcn": {
       "command": "npx",
       "args": ["-y", "shadcn@latest", "mcp"]
+    },
+    "asaas": {
+      "command": "npx",
+      "args": ["-y", "@theyahia/asaas-mcp"],
+      "env": {
+        "ASAAS_API_KEY": "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OjQxMmM1ODNmLTg0NzMtNDQ0Yy04MjJjLWZkNmM1ZmM4MzA3Nzo6JGFhY2hfZGIyYjliYjQtMDZjOS00Y2M5LWIzNjktZjk3OTliYTEzYjU1"
+      }
     }
   }
 }
