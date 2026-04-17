@@ -9,10 +9,11 @@
  *                            só quando placar errado + vencedor certo + |diff| igual
  * Gol 1º / 2º tempo:        5 pts cada
  * Expulsão — Sim certo:     12 pts | Não certo: 5 pts (assimétrico; acertar Sim é mais raro)
- * Pênalti:                   7 pts
+ * Pênalti — Sim certo:      12 pts | Não certo: 5 pts (mesmo padrão)
+ * VAR anulou gol — Sim:     12 pts | Não certo: 5 pts (mesmo padrão)
  * 1º a marcar:               8 pts
  * Posse de bola:             5 pts
- * Gabarito perfeito (8/8):  100 pts base (pré-multiplicador de fase; sobrescreve somas individuais)
+ * Gabarito perfeito (10/10): 100 pts base (pré-multiplicador de fase; sobrescreve somas individuais)
  *
  * MAX_BASE_POINTS = 100 (gabarito perfeito)
  */
@@ -25,6 +26,7 @@ export interface PredictionInput {
   goal_second_half: boolean | null;
   has_red_card:     boolean | null;
   has_penalty:      boolean | null;
+  has_var_goal:     boolean | null;
   first_to_score:   string | null;
   possession_winner:string | null;
 }
@@ -37,6 +39,7 @@ export interface MatchResultInput {
   goalSecondHalf: boolean;
   redCard:        boolean;
   penalty:        boolean;
+  varGoal:        boolean;
   firstToScore:   string;
   possession:     string;
 }
@@ -61,6 +64,7 @@ export function calculateMatchPoints(
     pred.goal_second_half === result.goalSecondHalf&&
     pred.has_red_card     === result.redCard       &&
     pred.has_penalty      === result.penalty       &&
+    pred.has_var_goal     === result.varGoal       &&
     pred.first_to_score   === result.firstToScore  &&
     pred.possession_winner=== result.possession;
 
@@ -101,7 +105,10 @@ export function calculateMatchPoints(
   }
 
   if (pred.has_penalty  !== null && pred.has_penalty  === result.penalty) {
-    pts += pred.has_penalty ? 12 : 5; // Sim certo=12, Não certo=5 (mesmo padrão da expulsão)
+    pts += pred.has_penalty ? 12 : 5;
+  }
+  if (pred.has_var_goal !== null && pred.has_var_goal === result.varGoal) {
+    pts += pred.has_var_goal ? 12 : 5;
   }
   if (pred.first_to_score  != null && pred.first_to_score  === result.firstToScore)  pts += 8;
   if (pred.possession_winner != null && pred.possession_winner === result.possession) pts += 5;

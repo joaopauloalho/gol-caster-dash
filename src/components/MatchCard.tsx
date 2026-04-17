@@ -319,6 +319,7 @@ interface MatchCardProps {
   resultGoalSecondHalf?: boolean | null;
   resultRedCard?: boolean | null;
   resultPenalty?: boolean | null;
+  resultVarGoal?: boolean | null;
   resultFirstToScore?: string | null;
   resultPossession?: string | null;
   onCompletionChange?: (id: number, isComplete: boolean) => void;
@@ -334,7 +335,7 @@ const MatchCard = ({
   hasSavedPrediction: externalHasSaved = false,
   resultHome = null, resultAway = null, resultWinner = null,
   resultGoalFirstHalf = null, resultGoalSecondHalf = null,
-  resultRedCard = null, resultPenalty = null,
+  resultRedCard = null, resultPenalty = null, resultVarGoal = null,
   resultFirstToScore = null, resultPossession = null,
   onCompletionChange, saveSignal, onSaved,
 }: MatchCardProps) => {
@@ -356,6 +357,7 @@ const MatchCard = ({
   const [goalSecondHalf,     setGoalSecondHalf]     = useState<boolean | null>(null);
   const [redCard,            setRedCard]            = useState<boolean | null>(null);
   const [penalty,            setPenalty]            = useState<boolean | null>(null);
+  const [varGoal,            setVarGoal]            = useState<boolean | null>(null);
   const [firstGoal,          setFirstGoal]          = useState<"A" | "N" | "B" | null>(null);
   const [possession,         setPossession]         = useState<"A" | "B" | null>(null);
   const [hasSavedPrediction, setHasSavedPrediction] = useState(externalHasSaved);
@@ -403,6 +405,7 @@ const MatchCard = ({
       if (d.goal_second_half != null) setGoalSecondHalf(d.goal_second_half);
       if (d.has_red_card     != null) setRedCard(d.has_red_card);
       if (d.has_penalty      != null) setPenalty(d.has_penalty);
+      if (d.has_var_goal     != null) setVarGoal(d.has_var_goal);
       if (d.first_to_score)           setFirstGoal(d.first_to_score);
       if (d.possession_winner)        setPossession(d.possession_winner);
       setHasSavedPrediction(true);
@@ -428,6 +431,7 @@ const MatchCard = ({
       setGoalSecondHalf((data.goal_second_half as boolean) ?? null);
       setRedCard(       (data.has_red_card     as boolean) ?? null);
       setPenalty(       (data.has_penalty      as boolean) ?? null);
+      setVarGoal(       (data.has_var_goal     as boolean) ?? null);
       setFirstGoal( (data.first_to_score    as "A" | "N" | "B") ?? null);
       setPossession((data.possession_winner as "A" | "B")      ?? null);
       if (data.points_earned != null) setPointsEarned(data.points_earned as number);
@@ -438,7 +442,7 @@ const MatchCard = ({
             home_score: data.home_score, away_score: data.away_score,
             winner_pick: data.winner_pick, goal_first_half: data.goal_first_half,
             goal_second_half: data.goal_second_half, has_red_card: data.has_red_card,
-            has_penalty: data.has_penalty, first_to_score: data.first_to_score,
+            has_penalty: data.has_penalty, has_var_goal: data.has_var_goal, first_to_score: data.first_to_score,
             possession_winner: data.possession_winner,
           }));
         } catch { /* ignorar */ }
@@ -463,11 +467,12 @@ const MatchCard = ({
     goalSecondHalf !== null,
     redCard !== null,
     penalty !== null,
+    varGoal !== null,
     firstGoal !== null,
     possession !== null,
   ].filter(Boolean).length;
 
-  // Full count for potential points display (8 fields total: score pair + winner + 6)
+  // Full count for potential points display (9 fields total: score pair + winner + 7)
   const filledCount = [
     hasScore,
     winner !== null,
@@ -475,11 +480,12 @@ const MatchCard = ({
     goalSecondHalf !== null,
     redCard !== null,
     penalty !== null,
+    varGoal !== null,
     firstGoal !== null,
     possession !== null,
   ].filter(Boolean).length;
 
-  const isComplete = hasScore && winner !== null && advancedFilledCount === 6;
+  const isComplete = hasScore && winner !== null && advancedFilledCount === 7;
 
   // Deadline = match start minus the 30-min lock window
   const deadlineMs = useMemo(() => {
@@ -567,6 +573,7 @@ const MatchCard = ({
       goal_second_half:  goalSecondHalf,
       has_red_card:      redCard,
       has_penalty:       penalty,
+      has_var_goal:      varGoal,
       first_to_score:    firstGoal,
       possession_winner: possession,
       updated_at:        new Date().toISOString(),
@@ -580,7 +587,7 @@ const MatchCard = ({
           home_score: scoreA, away_score: scoreB,
           winner_pick: winner, goal_first_half: goalFirstHalf,
           goal_second_half: goalSecondHalf, has_red_card: redCard,
-          has_penalty: penalty, first_to_score: firstGoal,
+          has_penalty: penalty, has_var_goal: varGoal, first_to_score: firstGoal,
           possession_winner: possession,
         }));
       } catch { /* ignorar */ }
@@ -960,6 +967,9 @@ const MatchCard = ({
                     <ToggleField label="Terá Pênalti?"    pointsSim={12} pointsNao={5}
                       value={penalty}        onChange={setPenalty}        disabled={isLocked}
                       resultValue={scored ? resultPenalty : undefined} />
+                    <ToggleField label="VAR Anulou Gol?"  pointsSim={12} pointsNao={5}
+                      value={varGoal}        onChange={setVarGoal}        disabled={isLocked}
+                      resultValue={scored ? resultVarGoal : undefined} />
                   </div>
 
                   {/* 1º a marcar */}

@@ -100,7 +100,7 @@ const Admin = () => {
   const [results, setResults] = useState<Record<number, {
     home: string; away: string; winner: string;
     goalFirstHalf: boolean | null; goalSecondHalf: boolean | null;
-    redCard: boolean | null; penalty: boolean | null;
+    redCard: boolean | null; penalty: boolean | null; varGoal: boolean | null;
     firstToScore: string; possession: string;
   }>>({});
 
@@ -301,7 +301,7 @@ const Admin = () => {
   const setResult = (matchId: number, field: string, value: unknown) => {
     setResults(prev => ({
       ...prev,
-      [matchId]: { home: "", away: "", winner: "", goalFirstHalf: null, goalSecondHalf: null, redCard: null, penalty: null, firstToScore: "", possession: "", ...prev[matchId], [field]: value },
+      [matchId]: { home: "", away: "", winner: "", goalFirstHalf: null, goalSecondHalf: null, redCard: null, penalty: null, varGoal: null, firstToScore: "", possession: "", ...prev[matchId], [field]: value },
     }));
   };
 
@@ -512,6 +512,7 @@ const Admin = () => {
                     { field: "goalSecondHalf", label: "Gol 2º Tempo" },
                     { field: "redCard", label: "Expulsão" },
                     { field: "penalty", label: "Pênalti" },
+                    { field: "varGoal", label: "VAR Anulou Gol" },
                   ].map(({ field, label }) => (
                     <div key={field} className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">{label}</span>

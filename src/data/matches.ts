@@ -21,6 +21,7 @@ export interface MatchData {
   resultGoalSecondHalf?: boolean | null;
   resultRedCard?: boolean | null;
   resultPenalty?: boolean | null;
+  resultVarGoal?: boolean | null;
   resultFirstToScore?: string | null;
   resultPossession?: string | null;
 }
@@ -121,6 +122,7 @@ export async function fetchMatchesByPhase(phase: PhaseKey): Promise<MatchData[]>
     resultGoalSecondHalf: row.result_goal_second_half ?? null,
     resultRedCard: row.result_red_card ?? null,
     resultPenalty: row.result_penalty ?? null,
+    resultVarGoal: row.result_var_goal ?? null,
     resultFirstToScore: row.result_first_to_score ?? null,
     resultPossession: row.result_possession ?? null,
   }));

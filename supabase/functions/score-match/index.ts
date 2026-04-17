@@ -45,6 +45,7 @@ interface Pred {
   goal_second_half:  boolean | null;
   has_red_card:      boolean | null;
   has_penalty:       boolean | null;
+  has_var_goal:      boolean | null;
   first_to_score:    string | null;
   possession_winner: string | null;
 }
@@ -57,6 +58,7 @@ interface Res {
   goalSecondHalf: boolean;
   redCard:        boolean;
   penalty:        boolean;
+  varGoal:        boolean;
   firstToScore:   string;
   possession:     string;
 }
@@ -71,6 +73,7 @@ function calculateMatchPoints(p: Pred, r: Res): number {
     p.goal_second_half === r.goalSecondHalf&&
     p.has_red_card     === r.redCard       &&
     p.has_penalty      === r.penalty       &&
+    p.has_var_goal     === r.varGoal       &&
     p.first_to_score   === r.firstToScore  &&
     p.possession_winner=== r.possession;
 
@@ -101,7 +104,10 @@ function calculateMatchPoints(p: Pred, r: Res): number {
     pts += p.has_red_card ? 12 : 5; // Sim certo=12, Não certo=5
   }
   if (p.has_penalty  !== null && p.has_penalty  === r.penalty) {
-    pts += p.has_penalty ? 12 : 5; // Sim certo=12, Não certo=5 (mesmo padrão da expulsão)
+    pts += p.has_penalty ? 12 : 5;
+  }
+  if (p.has_var_goal !== null && p.has_var_goal === r.varGoal) {
+    pts += p.has_var_goal ? 12 : 5;
   }
   if (p.first_to_score  != null && p.first_to_score  === r.firstToScore)  pts += 8;
   if (p.possession_winner != null && p.possession_winner === r.possession) pts += 5;
@@ -169,6 +175,7 @@ serve(async (req) => {
         result_goal_second_half: result.goalSecondHalf,
         result_red_card:         result.redCard,
         result_penalty:          result.penalty,
+        result_var_goal:         result.varGoal,
         result_first_to_score:   result.firstToScore,
         result_possession:       result.possession,
         scored:                  true,
