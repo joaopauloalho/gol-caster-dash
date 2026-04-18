@@ -23,6 +23,7 @@ const Matches = () => {
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [loading, setLoading] = useState(true);
   const [predictedIds, setPredictedIds] = useState<Set<number>>(new Set());
+  const [goldenByDay,  setGoldenByDay]  = useState<Record<string, number>>({});
   const [completedIds, setCompletedIds] = useState<Set<number>>(new Set());
   const [saveSignal, setSaveSignal] = useState(0);
   const { user } = useAuth();
@@ -47,11 +48,21 @@ const Matches = () => {
     const matchIds = matches.map(m => m.id);
     supabase
       .from("predictions")
-      .select("match_id")
+      .select("match_id, is_double_points")
       .eq("user_id", user.id)
       .in("match_id", matchIds)
       .then(({ data }) => {
-        if (data) setPredictedIds(new Set(data.map(p => p.match_id)));
+        if (!data) return;
+        setPredictedIds(new Set(data.map(p => p.match_id)));
+        const golden: Record<string, number> = {};
+        for (const p of data) {
+          if ((p as any).is_double_points) {
+            const match = matches.find(m => m.id === p.match_id);
+            const day = match?.startsAt?.split("T")[0] ?? match?.date;
+            if (day) golden[day] = p.match_id;
+          }
+        }
+        setGoldenByDay(golden);
       });
   }, [user, matches]);
 
@@ -95,6 +106,21 @@ const Matches = () => {
   const handleSaved = useCallback((matchId: number) => {
     setPredictedIds(prev => new Set([...prev, matchId]));
   }, []);
+
+  const handleGoldenChange = useCallback((matchId: number, isGolden: boolean) => {
+    const match = matches.find(m => m.id === matchId);
+    const day = match?.startsAt?.split("T")[0] ?? match?.date;
+    if (!day) return;
+    setGoldenByDay(prev => {
+      const next = { ...prev };
+      if (isGolden) {
+        next[day] = matchId;
+      } else if (next[day] === matchId) {
+        delete next[day];
+      }
+      return next;
+    });
+  }, [matches]);
 
   return (
     <div className="min-h-screen pb-40 pt-4">
@@ -215,6 +241,8 @@ const Matches = () => {
                       onCompletionChange={handleCompletionChange}
                       saveSignal={saveSignal}
                       onSaved={handleSaved}
+                      goldenMatchIdForDay={goldenByDay[match.startsAt?.split("T")[0] ?? match.date ?? ""] ?? null}
+                      onGoldenChange={handleGoldenChange}
                     />
                   ))}
                 </div>

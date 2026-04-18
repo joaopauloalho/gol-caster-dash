@@ -48,6 +48,7 @@ interface Pred {
   has_var_goal:      boolean | null;
   first_to_score:    string | null;
   possession_winner: string | null;
+  is_double_points:  boolean | null;
 }
 
 interface Res {
@@ -201,7 +202,7 @@ serve(async (req) => {
 
     for (const p of predictions) {
       const base = calculateMatchPoints(p as Pred, result as Res);
-      const total = base * multiplier;
+      const total = base * multiplier * ((p as Pred).is_double_points ? 2 : 1);
 
       await supabase
         .from("predictions")

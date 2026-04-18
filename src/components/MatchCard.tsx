@@ -325,6 +325,8 @@ interface MatchCardProps {
   onCompletionChange?: (id: number, isComplete: boolean) => void;
   saveSignal?: number;
   onSaved?: (id: number) => void;
+  goldenMatchIdForDay?: number | null;
+  onGoldenChange?: (matchId: number, isGolden: boolean) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -338,6 +340,7 @@ const MatchCard = ({
   resultRedCard = null, resultPenalty = null, resultVarGoal = null,
   resultFirstToScore = null, resultPossession = null,
   onCompletionChange, saveSignal, onSaved,
+  goldenMatchIdForDay = null, onGoldenChange,
 }: MatchCardProps) => {
   const multiplier   = getPhaseMultiplier(stage ?? "Group Stage");
   const localTime    = getLocalTime(date, time);
@@ -360,6 +363,7 @@ const MatchCard = ({
   const [varGoal,            setVarGoal]            = useState<boolean | null>(null);
   const [firstGoal,          setFirstGoal]          = useState<"A" | "N" | "B" | null>(null);
   const [possession,         setPossession]         = useState<"A" | "B" | null>(null);
+  const [isDoublePoints,     setIsDoublePoints]     = useState(false);
   const [hasSavedPrediction, setHasSavedPrediction] = useState(externalHasSaved);
   const [saved,              setSaved]              = useState(false);
   const [pointsEarned,       setPointsEarned]       = useState<number | null>(null);
@@ -407,6 +411,7 @@ const MatchCard = ({
       if (d.has_var_goal     != null) setVarGoal(d.has_var_goal);
       if (d.first_to_score)           setFirstGoal(d.first_to_score);
       if (d.possession_winner)        setPossession(d.possession_winner);
+      if (d.is_double_points != null) setIsDoublePoints(d.is_double_points);
       setHasSavedPrediction(true);
     } catch { /* corrompido — ignorar */ }
   }, [localKey]);
@@ -433,6 +438,7 @@ const MatchCard = ({
       setVarGoal(       (data.has_var_goal     as boolean) ?? null);
       setFirstGoal( (data.first_to_score    as "A" | "N" | "B") ?? null);
       setPossession((data.possession_winner as "A" | "B")      ?? null);
+      setIsDoublePoints((data.is_double_points as boolean) ?? false);
       if (data.points_earned != null) setPointsEarned(data.points_earned as number);
       setHasSavedPrediction(true);
       if (localKey) {
@@ -570,7 +576,8 @@ const MatchCard = ({
       }
     }
 
-    const { error } = await supabase.from("predictions").upsert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("predictions") as any).upsert({
       user_id: user.id, match_id: id,
       home_score:        scoreA === "" ? null : (scoreA as number),
       away_score:        scoreB === "" ? null : (scoreB as number),
@@ -582,6 +589,7 @@ const MatchCard = ({
       has_var_goal:      varGoal,
       first_to_score:    firstGoal,
       possession_winner: possession,
+      is_double_points:  isDoublePoints,
       updated_at:        new Date().toISOString(),
     }, { onConflict: "user_id,match_id" });
 
@@ -594,7 +602,7 @@ const MatchCard = ({
           winner_pick: winner, goal_first_half: goalFirstHalf,
           goal_second_half: goalSecondHalf, has_red_card: redCard,
           has_penalty: penalty, has_var_goal: varGoal, first_to_score: firstGoal,
-          possession_winner: possession,
+          possession_winner: possession, is_double_points: isDoublePoints,
         }));
       } catch { /* ignorar */ }
     }
@@ -602,6 +610,7 @@ const MatchCard = ({
     setHasSavedPrediction(true);
     setSaved(true);
     setAdvancedOpen(false);
+    onGoldenChange?.(id, isDoublePoints);
     onSaved?.(id);
     setTimeout(() => setSaved(false), 3000);
   };
@@ -612,7 +621,8 @@ const MatchCard = ({
   // ── Visual state ─────────────────────────────────────────────────────────────
   const isExact    = fieldChecks?.scoreHome && fieldChecks?.scoreAway;
   const isCorrect  = (pointsEarned ?? 0) > 0;
-  const isPerfect  = pointsEarned !== null && pointsEarned === MAX_BASE_POINTS * multiplier;
+  const isPerfect  = pointsEarned !== null && pointsEarned === MAX_BASE_POINTS * multiplier * (isDoublePoints ? 2 : 1);
+  const goldenUsedElsewhere = goldenMatchIdForDay != null && goldenMatchIdForDay !== id;
 
   const cardBorderClass = () => {
     if (matchStatus === "scored" && hasSavedPrediction && pointsEarned !== null) {
@@ -640,8 +650,8 @@ const MatchCard = ({
   const resultBadge = () => {
     if (matchStatus === "scored" && hasSavedPrediction && pointsEarned !== null) {
       if (isPerfect) return <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 animate-pulse-gold">🏆 GABARITO!</span>;
-      if (isExact)   return <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 animate-pulse-gold">⭐ Placar Exato!</span>;
-      if (isCorrect) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">✓ {pointsEarned} pts</span>;
+      if (isExact)   return <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 animate-pulse-gold">{isDoublePoints ? "⭐ Exato 2×!" : "⭐ Placar Exato!"}</span>;
+      if (isCorrect) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">{isDoublePoints ? "⭐ " : "✓ "}{pointsEarned} pts</span>;
       return          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/25">✗ Errou</span>;
     }
     if (saved)                                         return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">✓ Salvo!</span>;
@@ -1042,11 +1052,60 @@ const MatchCard = ({
                     </div>
                   </div>
 
+                  {/* Palpite de Ouro toggle */}
+                  {matchStatus === "open" && (
+                    <div
+                      className={cn(
+                        "rounded-xl p-3 border transition-all",
+                        isDoublePoints
+                          ? "bg-yellow-400/10 border-yellow-400/40 shadow-[0_0_14px_rgba(250,204,21,0.25)]"
+                          : goldenUsedElsewhere
+                            ? "bg-muted/20 border-border/20 opacity-50 cursor-not-allowed"
+                            : "bg-muted/30 border-border/30 hover:border-yellow-400/20 hover:bg-yellow-400/5 cursor-pointer",
+                      )}
+                      onClick={() => {
+                        if (isLocked || goldenUsedElsewhere) return;
+                        setIsDoublePoints(v => !v);
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={cn("text-lg shrink-0", isDoublePoints && "animate-pulse")}>⭐</span>
+                          <div className="min-w-0">
+                            <p className={cn("text-xs font-black leading-tight", isDoublePoints ? "text-yellow-300" : "text-foreground")}>
+                              Palpite de Ouro
+                            </p>
+                            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                              {goldenUsedElsewhere
+                                ? "Já usado nesta data — escolha outro jogo"
+                                : isDoublePoints
+                                  ? "Ativado! Seus pontos serão dobrados (2×)"
+                                  : "Dobra todos os seus pontos nesta partida (2×)"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className={cn(
+                          "relative w-10 h-5 rounded-full transition-colors shrink-0",
+                          isDoublePoints ? "bg-yellow-400" : "bg-muted/80",
+                        )}>
+                          <div className={cn(
+                            "absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200",
+                            isDoublePoints ? "left-5" : "left-0.5",
+                          )} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Gabarito perfeito hint */}
                   {isComplete && matchStatus === "open" && (
-                    <div className="text-center text-xs text-primary font-semibold p-2 rounded-xl bg-glass-gold">
-                      🏆 Palpite completo — Potencial: até {MAX_BASE_POINTS * multiplier} pts
-                      {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier} fase)</span>}
+                    <div className={cn(
+                      "text-center text-xs font-semibold p-2 rounded-xl",
+                      isDoublePoints ? "bg-yellow-400/10 text-yellow-300" : "bg-glass-gold text-primary",
+                    )}>
+                      🏆 Palpite completo — Potencial: até {MAX_BASE_POINTS * multiplier * (isDoublePoints ? 2 : 1)} pts
+                      {isDoublePoints && <span className="ml-1">⭐ 2×</span>}
+                      {multiplier > 1 && !isDoublePoints && <span className="ml-1 opacity-70">(×{multiplier} fase)</span>}
                     </div>
                   )}
                 </div>
