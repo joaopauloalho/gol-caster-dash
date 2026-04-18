@@ -579,7 +579,7 @@ const MatchCard = ({
       updated_at:        new Date().toISOString(),
     }, { onConflict: "user_id,match_id" });
 
-    if (error) { toast.error("Erro ao salvar palpite."); return; }
+    if (error) { console.error("Supabase upsert error:", error); toast.error("Erro ao salvar palpite."); return; }
 
     if (localKey) {
       try {
@@ -603,11 +603,13 @@ const MatchCard = ({
   handleSaveRef.current = handleSave;
 
   // ── Visual state ─────────────────────────────────────────────────────────────
-  const isExact   = fieldChecks?.scoreHome && fieldChecks?.scoreAway;
-  const isCorrect = (pointsEarned ?? 0) > 0;
+  const isExact    = fieldChecks?.scoreHome && fieldChecks?.scoreAway;
+  const isCorrect  = (pointsEarned ?? 0) > 0;
+  const isPerfect  = pointsEarned !== null && pointsEarned === MAX_BASE_POINTS * multiplier;
 
   const cardBorderClass = () => {
     if (matchStatus === "scored" && hasSavedPrediction && pointsEarned !== null) {
+      if (isPerfect)  return "border-yellow-400/60";
       if (isExact)    return "border-primary/50";
       if (isCorrect)  return "border-green-500/35";
       return "border-destructive/30";
@@ -619,6 +621,7 @@ const MatchCard = ({
 
   const cardBgClass = () => {
     if (matchStatus === "scored" && hasSavedPrediction && pointsEarned !== null) {
+      if (isPerfect)  return "bg-yellow-400/[0.04]";
       if (isExact)    return "bg-primary/[0.03]";
       if (isCorrect)  return "bg-green-500/[0.03]";
       return "bg-destructive/[0.02]";
@@ -629,6 +632,7 @@ const MatchCard = ({
 
   const resultBadge = () => {
     if (matchStatus === "scored" && hasSavedPrediction && pointsEarned !== null) {
+      if (isPerfect) return <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 animate-pulse-gold">🏆 GABARITO!</span>;
       if (isExact)   return <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-primary/15 text-primary border border-primary/30 animate-pulse-gold">⭐ Placar Exato!</span>;
       if (isCorrect) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-500/15 text-green-400 border border-green-500/25">✓ {pointsEarned} pts</span>;
       return          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-destructive/15 text-destructive border border-destructive/25">✗ Errou</span>;
@@ -780,14 +784,23 @@ const MatchCard = ({
         {matchStatus === "scored" && hasSavedPrediction && (
           <div className="flex items-center justify-center gap-3 py-2.5">
             {pointsEarned != null ? (
-              <>
-                <span className="text-3xl font-black text-primary tabular-nums leading-tight">
-                  {pointsEarned}<span className="text-sm font-semibold ml-0.5">pts</span>
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {isExact ? "Placar exato!" : fieldChecks?.winner ? "Acertou o vencedor" : "Resultado não acertado"}
-                </span>
-              </>
+              isPerfect ? (
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-3xl font-black text-yellow-300 tabular-nums leading-tight">
+                    {pointsEarned}<span className="text-sm font-semibold ml-0.5">pts</span>
+                  </span>
+                  <span className="text-xs font-black text-yellow-300 tracking-wide animate-pulse-gold">🏆 GABARITO PERFEITO!</span>
+                </div>
+              ) : (
+                <>
+                  <span className="text-3xl font-black text-primary tabular-nums leading-tight">
+                    {pointsEarned}<span className="text-sm font-semibold ml-0.5">pts</span>
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {isExact ? "Placar exato!" : fieldChecks?.winner ? "Acertou o vencedor" : "Resultado não acertado"}
+                  </span>
+                </>
+              )
             ) : (
               <span className="text-xs text-muted-foreground italic flex items-center gap-1.5">
                 <Loader2 className="w-3 h-3 animate-spin" /> Carregando pontos...
@@ -864,7 +877,7 @@ const MatchCard = ({
                   ) : (
                     <motion.span key="partial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
                       <Zap className="w-4 h-4 opacity-40" />
-                      {advancedFilledCount}/6 campos avançados preenchidos
+                      {advancedFilledCount}/7 campos avançados preenchidos
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -905,9 +918,9 @@ const MatchCard = ({
                   </span>
                   <span className={cn(
                     "text-[11px] font-bold tabular-nums",
-                    advancedFilledCount === 6 ? "text-primary" : "text-muted-foreground",
+                    advancedFilledCount === 7 ? "text-primary" : "text-muted-foreground",
                   )}>
-                    {advancedFilledCount}/6
+                    {advancedFilledCount}/7
                   </span>
                 </div>
               )}
@@ -1023,7 +1036,7 @@ const MatchCard = ({
                   </div>
 
                   {/* Gabarito perfeito hint */}
-                  {filledCount === 8 && matchStatus === "open" && (
+                  {isComplete && matchStatus === "open" && (
                     <div className="text-center text-xs text-primary font-semibold p-2 rounded-xl bg-glass-gold">
                       🏆 Palpite completo — Potencial: até {MAX_BASE_POINTS * multiplier} pts
                       {multiplier > 1 && <span className="ml-1 opacity-70">(×{multiplier} fase)</span>}

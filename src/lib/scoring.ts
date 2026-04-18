@@ -45,7 +45,7 @@ export interface MatchResultInput {
 }
 
 /** Pontos base máximos (pré-multiplicador) — gabarito perfeito */
-export const MAX_BASE_POINTS = 100;
+export const MAX_BASE_POINTS = 125;
 
 /**
  * Retorna pontos BASE (pré-multiplicador de fase).

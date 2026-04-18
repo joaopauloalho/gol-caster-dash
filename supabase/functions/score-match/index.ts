@@ -13,7 +13,7 @@
  * Pênalti:                   7 pts
  * 1º a marcar:               8 pts
  * Posse de bola:             5 pts
- * Gabarito perfeito (8/8):  100 pts base, depois × multiplicador de fase
+ * Gabarito perfeito (10/10): 125 pts base, depois × multiplicador de fase
  */
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -77,7 +77,7 @@ function calculateMatchPoints(p: Pred, r: Res): number {
     p.first_to_score   === r.firstToScore  &&
     p.possession_winner=== r.possession;
 
-  if (isPerfect) return 100;
+  if (isPerfect) return 125;
 
   let pts = 0;
 
