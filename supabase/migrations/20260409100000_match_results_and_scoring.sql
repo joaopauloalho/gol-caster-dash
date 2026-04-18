@@ -15,6 +15,8 @@ ALTER TABLE public.matches
 CREATE POLICY "Admin can read all participants" ON public.participants
   FOR SELECT TO authenticated USING (true);
 
--- Policy para participants update próprio registro
-CREATE POLICY IF NOT EXISTS "Users can update own participant" ON public.participants
-  FOR UPDATE TO authenticated USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users can update own participant" ON public.participants;
+
+CREATE POLICY "Users can update own participant" ON public.participants
+  FOR UPDATE
+  USING (auth.uid() = user_id);

@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS public.group_members (
   participant_id uuid NOT NULL,
   joined_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE public.group_members ADD COLUMN IF NOT EXISTS participant_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
 CREATE UNIQUE INDEX IF NOT EXISTS group_members_unique_idx ON public.group_members(group_id, participant_id);
 
 -- Also support user_id column for Groups.tsx compatibility
