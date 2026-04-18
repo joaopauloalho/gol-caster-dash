@@ -286,9 +286,9 @@ const ToggleField = ({ label, pointsSim, pointsNao, value, onChange, disabled, r
       </label>
       <div className="flex gap-2">
         <button type="button" onClick={() => !disabled && onChange(value === true ? null : true)} disabled={disabled}
-          className={cn("flex-1 py-2 rounded-lg text-xs font-bold transition-all disabled:cursor-not-allowed", simClass())}>Sim</button>
+          className={cn("flex-1 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:cursor-not-allowed", simClass())}>Sim</button>
         <button type="button" onClick={() => !disabled && onChange(value === false ? null : false)} disabled={disabled}
-          className={cn("flex-1 py-2 rounded-lg text-xs font-bold transition-all disabled:cursor-not-allowed", naoClass())}>Não</button>
+          className={cn("flex-1 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 disabled:cursor-not-allowed", naoClass())}>Não</button>
       </div>
     </div>
   );
@@ -1067,153 +1067,37 @@ const MatchCard = ({
                 )}
 
                 <div className={loadingPrediction ? "hidden" : "space-y-3"}>
-                  {/* ── Winner + Expert Panel — stacked on mobile, side-by-side on md+ ── */}
-                  <div className="md:grid md:grid-cols-2 md:gap-3 space-y-3 md:space-y-0">
-
-                    {/* Vencedor / Resultado */}
-                    <div>
-                      <label className={cn(
-                        "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
-                        fieldChecks?.winner ? "text-green-400" : "text-muted-foreground",
-                      )}>
-                        Vencedor / Empate <span className="text-primary">(10 pts)</span>
-                        {fieldChecks?.winner && <Check className="w-3.5 h-3.5" />}
-                      </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {([
-                          { key: "A" as const, label: teamA },
-                          { key: "X" as const, label: "Empate" },
-                          { key: "B" as const, label: teamB },
-                        ]).map(({ key, label }) => {
-                          const isSelected = winner === key;
-                          const isCrt = scored && resultWinner != null ? key === resultWinner : null;
-                          return (
-                            <button key={key} type="button" disabled={isLocked}
-                              onClick={() => {
-                                if (isLocked) return;
-                                const next = winner === key ? null : key;
-                                autoWinnerRef.current = null;
-                                setWinner(next);
-                              }}
-                              className={choiceButtonClass(isSelected, isCrt)}
-                            >{label}</button>
-                          );
-                        })}
-                      </div>
+                  {/* ── Vencedor / Empate (full width) ── */}
+                  <div>
+                    <label className={cn(
+                      "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
+                      fieldChecks?.winner ? "text-green-400" : "text-muted-foreground",
+                    )}>
+                      Vencedor / Empate <span className="text-primary">(10 pts)</span>
+                      {fieldChecks?.winner && <Check className="w-3.5 h-3.5" />}
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([
+                        { key: "A" as const, label: teamA },
+                        { key: "X" as const, label: "Empate" },
+                        { key: "B" as const, label: teamB },
+                      ]).map(({ key, label }) => {
+                        const isSelected = winner === key;
+                        const isCrt = scored && resultWinner != null ? key === resultWinner : null;
+                        return (
+                          <button key={key} type="button" disabled={isLocked}
+                            onClick={() => {
+                              if (isLocked) return;
+                              const next = winner === key ? null : key;
+                              autoWinnerRef.current = null;
+                              setWinner(next);
+                            }}
+                            className={choiceButtonClass(isSelected, isCrt)}
+                          >{label}</button>
+                        );
+                      })}
                     </div>
-
-                    {/* ── Especialista panel ── */}
-                    {(() => {
-                      const isNoGoal      = firstGoalMinute === 0;
-                      const minuteCorrect = fieldChecks?.minute ?? false;
-                      return (
-                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.02] overflow-hidden">
-
-                          {/* Panel header */}
-                          <div className="px-3 py-2 border-b border-amber-500/15 flex items-center gap-2">
-                            <span className="text-[10px] font-black text-amber-500/60 uppercase tracking-widest">Especialista</span>
-                          </div>
-
-                          {/* Minute input */}
-                          <div className="px-3 pt-3 pb-3 border-b border-amber-500/10">
-                            <div className="flex items-center justify-between mb-2.5">
-                              <div className="flex items-center gap-1.5">
-                                <Clock className={cn("w-3.5 h-3.5 shrink-0", minuteCorrect ? "text-green-400" : "text-muted-foreground/60")} />
-                                <span className={cn("text-xs font-semibold uppercase tracking-wide", minuteCorrect ? "text-green-400" : "text-muted-foreground")}>
-                                  Minuto do 1º Gol
-                                </span>
-                                {minuteCorrect && <Check className="w-3.5 h-3.5 text-green-400" />}
-                              </div>
-                              <span className="text-[11px] text-primary font-bold">25 pts</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={isNoGoal || firstGoalMinute === null ? "" : String(firstGoalMinute)}
-                                onChange={e => {
-                                  if (isLocked) return;
-                                  const raw = e.target.value.replace(/\D/g, "");
-                                  if (raw === "") { setFirstGoalMinute(null); return; }
-                                  const n = Math.min(90, parseInt(raw, 10));
-                                  if (!isNaN(n) && n > 0) setFirstGoalMinute(n);
-                                }}
-                                disabled={isLocked || isNoGoal}
-                                placeholder="—"
-                                className={cn(
-                                  "flex-1 min-w-0 h-11 text-center text-2xl font-black rounded-xl border-2 bg-background focus:outline-none transition-all",
-                                  "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none",
-                                  isNoGoal
-                                    ? "border-border/20 text-muted-foreground/30"
-                                    : firstGoalMinute !== null
-                                      ? minuteCorrect
-                                        ? "border-green-500/40 text-green-400"
-                                        : "border-primary/40 text-foreground"
-                                      : "border-border/50 text-muted-foreground/40",
-                                  (isLocked || isNoGoal) && "opacity-50 cursor-not-allowed",
-                                )}
-                              />
-                              <button type="button" disabled={isLocked}
-                                onClick={() => !isLocked && setFirstGoalMinute(isNoGoal ? null : 0)}
-                                className={cn(
-                                  "flex-shrink-0 h-11 px-3 rounded-xl text-sm font-bold transition-all active:scale-95",
-                                  isNoGoal
-                                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
-                                    : "bg-muted text-muted-foreground hover:text-foreground",
-                                  isLocked && "opacity-50 cursor-not-allowed",
-                                )}>
-                                0-0
-                              </button>
-                              {([45, 90] as const).map(m => (
-                                <button key={m} type="button"
-                                  disabled={isLocked || isNoGoal}
-                                  onClick={() => !isLocked && !isNoGoal && setFirstGoalMinute(m)}
-                                  title={m === 45 ? "45º min + acréscimos do 1º tempo" : "90º min + acréscimos do 2º tempo"}
-                                  className={cn(
-                                    "flex-shrink-0 h-11 px-3 rounded-xl text-sm font-bold transition-all active:scale-95",
-                                    firstGoalMinute === m && !isNoGoal
-                                      ? "bg-primary/20 text-primary border border-primary/30"
-                                      : "bg-muted text-muted-foreground hover:text-foreground",
-                                    (isLocked || isNoGoal) && "opacity-30 cursor-not-allowed",
-                                  )}>
-                                  {m}+
-                                </button>
-                              ))}
-                            </div>
-                            {scored && (
-                              <p className="text-[11px] text-muted-foreground mt-2">
-                                Resultado: {(resultFirstGoalMinute === null || resultFirstGoalMinute === 0) ? "Sem gol" : `${resultFirstGoalMinute}'`}
-                              </p>
-                            )}
-                          </div>
-
-                          {/* 3-col compact toggles */}
-                          <div className="px-3 py-3 grid grid-cols-3 gap-2">
-                            <ExpertToggle
-                              icon={<ScanSearch className="w-3.5 h-3.5" />}
-                              label="Gol/VAR" pts="Sim 12 / Não 5"
-                              value={varGoal} onChange={setVarGoal} disabled={isLocked}
-                              resultValue={scored ? resultVarGoal : undefined}
-                            />
-                            <ExpertToggle
-                              icon={<Footprints className="w-3.5 h-3.5" />}
-                              label="Gol 1ºT" pts="5 pts"
-                              value={goalFirstHalf} onChange={setGoalFirstHalf} disabled={isLocked}
-                              resultValue={scored ? resultGoalFirstHalf : undefined}
-                            />
-                            <ExpertToggle
-                              icon={<Square className="w-3.5 h-3.5" />}
-                              label="Expulsão" pts="Sim 12 / Não 5"
-                              value={redCard} onChange={setRedCard} disabled={isLocked}
-                              resultValue={scored ? resultRedCard : undefined}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                  </div>{/* end responsive grid */}
+                  </div>
 
                   {/* ── Gol 2ºT + Pênalti ── */}
                   <div className="grid grid-cols-2 gap-3">
@@ -1243,7 +1127,7 @@ const MatchCard = ({
                     </div>
                   )}
 
-                  {/* 1º a marcar */}
+                  {/* ── 1º a marcar ── */}
                   <div>
                     <label className={cn(
                       "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
@@ -1270,7 +1154,7 @@ const MatchCard = ({
                     </div>
                   </div>
 
-                  {/* Posse */}
+                  {/* ── Posse ── */}
                   <div>
                     <label className={cn(
                       "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
@@ -1293,16 +1177,131 @@ const MatchCard = ({
                     </div>
                   </div>
 
-                  {/* Palpite de Ouro toggle */}
+                  {/* ── Especialista panel (ao final do formulário) ── */}
+                  {(() => {
+                    const isNoGoal      = firstGoalMinute === 0;
+                    const minuteCorrect = fieldChecks?.minute ?? false;
+                    return (
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/[0.02] overflow-hidden">
+
+                        {/* Panel header */}
+                        <div className="px-4 py-2.5 border-b border-amber-500/15 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Swords className="w-3.5 h-3.5 text-amber-500/60" />
+                            <span className="text-[10px] font-black text-amber-500/70 uppercase tracking-widest">Especialista</span>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground/50 font-medium">campos bônus</span>
+                        </div>
+
+                        {/* Minute input */}
+                        <div className="px-4 pt-3 pb-3 border-b border-amber-500/10">
+                          <div className="flex items-center justify-between mb-2.5">
+                            <div className="flex items-center gap-1.5">
+                              <Clock className={cn("w-3.5 h-3.5 shrink-0", minuteCorrect ? "text-green-400" : "text-muted-foreground/60")} />
+                              <span className={cn("text-xs font-bold uppercase tracking-wide", minuteCorrect ? "text-green-400" : "text-muted-foreground")}>
+                                Minuto do 1º Gol
+                              </span>
+                              {minuteCorrect && <Check className="w-3.5 h-3.5 text-green-400" />}
+                            </div>
+                            <span className="text-xs font-bold text-primary">25 pts</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                              value={isNoGoal || firstGoalMinute === null ? "" : String(firstGoalMinute)}
+                              onChange={e => {
+                                if (isLocked) return;
+                                const raw = e.target.value.replace(/\D/g, "");
+                                if (raw === "") { setFirstGoalMinute(null); return; }
+                                const n = Math.min(90, parseInt(raw, 10));
+                                if (!isNaN(n) && n > 0) setFirstGoalMinute(n);
+                              }}
+                              disabled={isLocked || isNoGoal}
+                              placeholder="—"
+                              className={cn(
+                                "flex-1 min-w-0 h-11 text-center text-2xl font-black rounded-xl border-2 bg-background focus:outline-none transition-all",
+                                "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none",
+                                isNoGoal
+                                  ? "border-border/20 text-muted-foreground/30"
+                                  : firstGoalMinute !== null
+                                    ? minuteCorrect
+                                      ? "border-green-500/40 text-green-400"
+                                      : "border-primary/40 text-foreground"
+                                    : "border-border/50 text-muted-foreground/40",
+                                (isLocked || isNoGoal) && "opacity-50 cursor-not-allowed",
+                              )}
+                            />
+                            <button type="button" disabled={isLocked}
+                              onClick={() => !isLocked && setFirstGoalMinute(isNoGoal ? null : 0)}
+                              className={cn(
+                                "flex-shrink-0 h-11 px-3 rounded-xl text-sm font-bold transition-all active:scale-95",
+                                isNoGoal
+                                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                                  : "bg-muted text-muted-foreground hover:text-foreground",
+                                isLocked && "opacity-50 cursor-not-allowed",
+                              )}>
+                              0-0
+                            </button>
+                            {([45, 90] as const).map(m => (
+                              <button key={m} type="button"
+                                disabled={isLocked || isNoGoal}
+                                onClick={() => !isLocked && !isNoGoal && setFirstGoalMinute(m)}
+                                title={m === 45 ? "45º min + acréscimos do 1º tempo" : "90º min + acréscimos do 2º tempo"}
+                                className={cn(
+                                  "flex-shrink-0 h-11 px-3 rounded-xl text-sm font-bold transition-all active:scale-95",
+                                  firstGoalMinute === m && !isNoGoal
+                                    ? "bg-primary/20 text-primary border border-primary/30"
+                                    : "bg-muted text-muted-foreground hover:text-foreground",
+                                  (isLocked || isNoGoal) && "opacity-30 cursor-not-allowed",
+                                )}>
+                                {m}+
+                              </button>
+                            ))}
+                          </div>
+                          {scored && (
+                            <p className="text-[11px] text-muted-foreground mt-2">
+                              Resultado: {(resultFirstGoalMinute === null || resultFirstGoalMinute === 0) ? "Sem gol" : `${resultFirstGoalMinute}'`}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* 3-col compact toggles */}
+                        <div className="p-4 grid grid-cols-3 gap-2">
+                          <ExpertToggle
+                            icon={<ScanSearch className="w-3.5 h-3.5" />}
+                            label="Gol/VAR" pts="Sim 12 / Não 5"
+                            value={varGoal} onChange={setVarGoal} disabled={isLocked}
+                            resultValue={scored ? resultVarGoal : undefined}
+                          />
+                          <ExpertToggle
+                            icon={<Footprints className="w-3.5 h-3.5" />}
+                            label="Gol 1ºT" pts="5 pts"
+                            value={goalFirstHalf} onChange={setGoalFirstHalf} disabled={isLocked}
+                            resultValue={scored ? resultGoalFirstHalf : undefined}
+                          />
+                          <ExpertToggle
+                            icon={<Square className="w-3.5 h-3.5" />}
+                            label="Expulsão" pts="Sim 12 / Não 5"
+                            value={redCard} onChange={setRedCard} disabled={isLocked}
+                            resultValue={scored ? resultRedCard : undefined}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* ── Palpite de Ouro — visual premium ── */}
                   {matchStatus === "open" && (
                     <div
                       className={cn(
-                        "rounded-xl p-3 border transition-all",
+                        "rounded-xl p-4 border transition-all duration-200",
                         isDoublePoints
-                          ? "bg-yellow-400/10 border-yellow-400/40 shadow-[0_0_14px_rgba(250,204,21,0.25)]"
+                          ? "bg-gradient-to-br from-yellow-400/15 to-amber-600/10 border-yellow-400/60 shadow-[0_0_20px_rgba(250,204,21,0.35)]"
                           : goldenUsedElsewhere
                             ? "bg-muted/20 border-border/20 opacity-50 cursor-not-allowed"
-                            : "bg-muted/30 border-border/30 hover:border-yellow-400/20 hover:bg-yellow-400/5 cursor-pointer",
+                            : "bg-gradient-to-br from-yellow-400/[0.04] to-amber-500/[0.03] border-yellow-400/20 hover:border-yellow-400/35 hover:from-yellow-400/[0.07] cursor-pointer",
                       )}
                       onClick={() => {
                         if (isLocked || goldenUsedElsewhere) return;
@@ -1338,7 +1337,7 @@ const MatchCard = ({
                     </div>
                   )}
 
-                  {/* Gabarito perfeito hint */}
+                  {/* ── Gabarito perfeito hint ── */}
                   {isComplete && matchStatus === "open" && (
                     <div className={cn(
                       "text-center text-xs font-semibold p-2 rounded-xl",
