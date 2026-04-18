@@ -333,10 +333,10 @@ const ExpertToggle = ({ icon, label, pts, value, onChange, disabled, resultValue
       "rounded-xl p-2.5 flex flex-col gap-2 transition-colors",
       isCorrect ? "bg-green-500/10 border border-green-500/20" : "bg-muted/50 border border-border/30",
     )}>
-      <div className="flex items-center gap-1.5 leading-none">
-        <span className={cn("shrink-0", isCorrect ? "text-green-400" : "text-muted-foreground/60")}>{icon}</span>
-        <span className="text-[11px] font-black text-muted-foreground uppercase tracking-wide truncate">{label}</span>
-        {isCorrect && <Check className="w-3 h-3 text-green-400 shrink-0 ml-auto" />}
+      <div className="flex items-start gap-1.5">
+        <span className={cn("shrink-0 mt-0.5", isCorrect ? "text-green-400" : "text-muted-foreground/60")}>{icon}</span>
+        <span className="text-[11px] font-black text-muted-foreground uppercase tracking-wide leading-tight flex-1">{label}</span>
+        {isCorrect && <Check className="w-3 h-3 text-green-400 shrink-0 mt-0.5" />}
       </div>
       <div className="text-[10px] text-primary font-semibold leading-none">{pts}</div>
       <div className="flex gap-1.5">
