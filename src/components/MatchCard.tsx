@@ -366,6 +366,7 @@ const MatchCard = ({
   const [isDoublePoints,     setIsDoublePoints]     = useState(false);
   const [hasSavedPrediction, setHasSavedPrediction] = useState(externalHasSaved);
   const [saved,              setSaved]              = useState(false);
+  const [isSaving,           setIsSaving]           = useState(false);
   const [pointsEarned,       setPointsEarned]       = useState<number | null>(null);
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -550,8 +551,9 @@ const MatchCard = ({
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (isLocked) return;
+    if (isLocked || isSaving) return;
     if (!user) { toast.error("Faça login para salvar palpites."); navigate("/auth"); return; }
+    setIsSaving(true);
     if (paywallActive && !isActive && !hasPaid) {
       toast.error("Assine o plano para participar da Copa!", {
         action: { label: "Ver Planos", onClick: () => navigate("/planos") },
@@ -593,7 +595,7 @@ const MatchCard = ({
       updated_at:        new Date().toISOString(),
     }, { onConflict: "user_id,match_id" });
 
-    if (error) { console.error("Supabase upsert error:", error); toast.error("Erro ao salvar palpite."); return; }
+    if (error) { console.error("Supabase upsert error:", error); toast.error("Erro ao salvar palpite."); setIsSaving(false); return; }
 
     if (localKey) {
       try {
@@ -610,6 +612,7 @@ const MatchCard = ({
     setHasSavedPrediction(true);
     setSaved(true);
     setAdvancedOpen(false);
+    setIsSaving(false);
     onGoldenChange?.(id, isDoublePoints);
     onSaved?.(id);
     setTimeout(() => setSaved(false), 3000);
@@ -894,17 +897,21 @@ const MatchCard = ({
               <motion.button
                 type="button"
                 onClick={handleSave}
-                disabled={!isComplete}
-                whileTap={isComplete ? { scale: 0.98 } : undefined}
+                disabled={!isComplete || isSaving}
+                whileTap={isComplete && !isSaving ? { scale: 0.98 } : undefined}
                 className={cn(
                   "w-full py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
-                  isComplete
+                  isComplete && !isSaving
                     ? "btn-gold animate-pulse-gold"
                     : "bg-muted/40 text-muted-foreground/40 cursor-not-allowed border border-border/30",
                 )}
               >
                 <AnimatePresence mode="wait">
-                  {isComplete ? (
+                  {isSaving ? (
+                    <motion.span key="saving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Salvando…
+                    </motion.span>
+                  ) : isComplete ? (
                     <motion.span key="complete" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
                       <Zap className="w-4 h-4" /> Confirmar Palpite
                     </motion.span>

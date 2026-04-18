@@ -136,7 +136,7 @@ const Admin = () => {
   const fetchParticipantsAndMatches = async () => {
     setLoading(true);
     const [{ data: p }, { data: m }] = await Promise.all([
-      supabase.from("participants").select("*").order("created_at", { ascending: false }),
+      supabase.from("participants").select("*").order("created_at", { ascending: false }).limit(500),
       supabase.from("matches").select("id, match_number, team_a, team_b, stage, date, scored, result_home, result_away").order("match_number"),
     ]);
     setParticipants(p || []);
@@ -169,7 +169,7 @@ const Admin = () => {
 
   const fetchCoupons = async () => {
     setCouponsLoading(true);
-    const { data, error } = await supabase.from("coupons").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase.from("coupons").select("*").order("created_at", { ascending: false }).limit(200);
     if (error) { toast.error("Erro ao carregar cupons"); }
     else { setCoupons(data || []); }
     setCouponsLoading(false);

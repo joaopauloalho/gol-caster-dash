@@ -13,9 +13,9 @@
  * VAR anulou gol — Sim:     12 pts | Não certo: 5 pts (mesmo padrão)
  * 1º a marcar:               8 pts
  * Posse de bola:             5 pts
- * Gabarito perfeito (10/10): 100 pts base (pré-multiplicador de fase; sobrescreve somas individuais)
+ * Gabarito perfeito (10/10): 125 pts base (pré-multiplicador de fase; sobrescreve somas individuais)
  *
- * MAX_BASE_POINTS = 100 (gabarito perfeito)
+ * MAX_BASE_POINTS = 125 (gabarito perfeito)
  */
 
 export interface PredictionInput {
@@ -55,7 +55,7 @@ export function calculateMatchPoints(
   pred: PredictionInput,
   result: MatchResultInput,
 ): number {
-  // ── Gabarito perfeito: todos os 8 campos batem → 100 pts base ─────────────
+  // ── Gabarito perfeito: todos os campos batem → 125 pts base ──────────────
   const isPerfect =
     pred.home_score       === result.home          &&
     pred.away_score       === result.away          &&

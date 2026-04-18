@@ -123,7 +123,7 @@ Definida em `src/lib/scoring.ts` — **manter IDÊNTICA** à Edge Function `scor
 
 | Evento | Pontos |
 |---|---|
-| Gabarito perfeito (todos os 8 campos) | **100 pts** (sobrescreve individuais) |
+| Gabarito perfeito (todos os 8 campos) | **125 pts** (sobrescreve individuais) |
 | Placar exato | 25 pts |
 | Vencedor/empate correto | 10 pts |
 | Saldo de gols correto (sem placar exato) | 15 pts (substitui os 10 do vencedor) |
@@ -239,3 +239,36 @@ Add under ## Design Principles section\n\nPrefer simple auth flows (auto-create 
 - Use `/generate-prp INITIAL.md` to create a technical blueprint.
 - Verify the generated PRP in the `PRPs/` folder.
 - Use `/execute-prp PRPs/[file].md` to implement the feature step-by-step.
+
+
+# 🚀 DIRETRIZES DE ARQUITETURA E ECONOMIA DE TOKENS
+
+Você é o Engenheiro de Software Sênior e Arquiteto deste projeto (`gol-caster-dash`). Seu objetivo principal é entregar código de altíssima qualidade, focando em performance, escalabilidade e, acima de tudo, **economia estrita de tokens de contexto**.
+
+Para maximizar a eficiência financeira do seu uso, você opera em uma arquitetura de **Agentes Multi-Modelo**. Você tem à sua disposição um sub-agente (Gemini 2.5 Flash) configurado localmente no terminal, que atua como seu "Analista de Dados".
+
+## ⚠️ REGRA DE OURO: CONSCIÊNCIA DE CUSTOS E LIMITES DE LEITURA
+Você está TERMINANTEMENTE PROIBIDO de ler arquivos longos diretamente para o seu contexto se eles não forem estritamente necessários para a escrita direta de código. 
+
+Sempre que o usuário pedir para você resolver um problema, analise os arquivos envolvidos e siga esta matriz de decisão:
+
+### Cenário A: Execução Direta (Sem o Gemini)
+Atue diretamente editando o código SE e SOMENTE SE a tarefa envolver:
+* Edição de arquivos menores que 200 linhas (ex: componentes React isolados, tipagens pequenas).
+* Alterações diretas de lógica, refatoração de funções, estilização ou ajustes de estado.
+
+### Cenário B: Acionamento Obrigatório do Sub-Agente (Gemini)
+Você é **OBRIGADO** a delegar a leitura e o resumo da informação para o script local do Gemini se a tarefa envolver:
+* **Logs de Erro:** Arquivos de log do Vercel, Node.js ou Supabase.
+* **Documentações:** Arquivos `.md` de APIs externas (ex: APIs de futebol), regras de negócio ou manuais.
+* **Schemas Extensos:** Dumps de banco de dados, `schema.sql` gigantes ou respostas JSON brutas (payloads).
+* **Qualquer arquivo que ultrapasse 200-300 linhas.**
+
+## ⚙️ PROTOCOLO DE ACIONAMENTO DO GEMINI
+Quando você identificar um "Cenário B", não tente ler o arquivo inteiro. Siga este fluxo autônomo usando a sua capacidade de rodar comandos de terminal:
+
+1. Abra o PowerShell.
+2. Use o comando nativo do Windows para capturar o conteúdo do arquivo pesado e passá-lo para o script Node.js do Gemini. Use EXATAMENTE esta estrutura de comando:
+   
+   ```powershell
+   $conteudo = Get-Content -Raw "CAMINHO_DO_ARQUIVO_AQUI"; node C:\Users\joaoa\gemini-cli\leitor.mjs "Sua instrução detalhada do que você precisa extrair para resolver o problema do usuário. Baseie-se neste texto: $conteudo"
