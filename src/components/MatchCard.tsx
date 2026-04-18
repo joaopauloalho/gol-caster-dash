@@ -364,7 +364,6 @@ const MatchCard = ({
   const [saved,              setSaved]              = useState(false);
   const [pointsEarned,       setPointsEarned]       = useState<number | null>(null);
 
-  // Advanced section: controlled state (false = closed)
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Refs
@@ -496,6 +495,13 @@ const MatchCard = ({
     return null;
   }, [startsAt, date, time]);
 
+  // ── Auto-open advanced fields when any score is entered ──────────────────────
+  useEffect(() => {
+    if ((scoreA !== "" || scoreB !== "") && !isLocked) {
+      setAdvancedOpen(true);
+    }
+  }, [scoreA, scoreB]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Auto-fill winner from score ──────────────────────────────────────────────
   useEffect(() => {
     if (isLocked || !hasScore) return;
@@ -595,6 +601,7 @@ const MatchCard = ({
 
     setHasSavedPrediction(true);
     setSaved(true);
+    setAdvancedOpen(false);
     onSaved?.(id);
     setTimeout(() => setSaved(false), 3000);
   };
