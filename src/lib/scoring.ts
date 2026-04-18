@@ -35,6 +35,9 @@ export interface PredictionInput {
   possession_winner:   string | null;
   /** null=não respondeu, 0=sem gol, 1-90=minuto */
   first_goal_minute?:  number | null;
+  /** only for knockout stages */
+  has_overtime?:       boolean | null;
+  has_shootout?:       boolean | null;
 }
 
 export interface MatchResultInput {
@@ -50,6 +53,9 @@ export interface MatchResultInput {
   possession:         string;
   /** null=sem gols, 1-90=minuto do 1º gol */
   firstGoalMinute?:   number | null;
+  /** only for knockout stages */
+  overtime?:          boolean | null;
+  shootout?:          boolean | null;
 }
 
 /** Pontos base máximos (pré-multiplicador) — gabarito 125 + minuto 25 */
@@ -132,6 +138,14 @@ export function calculateMatchPoints(
         (!predNoGoal && !realNoGoal && pfgm === result.firstGoalMinute)) {
       pts += 25;
     }
+  }
+
+  // ── Prorrogação / Pênaltis (knockout only — natural no-op for group stage) ───
+  if (pred.has_overtime != null && result.overtime != null) {
+    pts += pred.has_overtime === result.overtime ? (pred.has_overtime ? 8 : 5) : 0;
+  }
+  if (pred.has_shootout != null && result.shootout != null) {
+    pts += pred.has_shootout === result.shootout ? (pred.has_shootout ? 12 : 5) : 0;
   }
 
   return pts;

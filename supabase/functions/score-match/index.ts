@@ -51,6 +51,9 @@ interface Pred {
   is_double_points:   boolean | null;
   /** null=não respondeu, 0=sem gol, 1-90=minuto */
   first_goal_minute?: number | null;
+  /** only for knockout stages */
+  has_overtime?:      boolean | null;
+  has_shootout?:      boolean | null;
 }
 
 interface Res {
@@ -66,6 +69,9 @@ interface Res {
   possession:        string;
   /** null=sem gols, 1-90=minuto do 1º gol */
   firstGoalMinute?:  number | null;
+  /** only for knockout stages */
+  overtime?:         boolean | null;
+  shootout?:         boolean | null;
 }
 
 function calculateMatchPoints(p: Pred, r: Res): number {
@@ -127,6 +133,14 @@ function calculateMatchPoints(p: Pred, r: Res): number {
         (!predNoGoal && !realNoGoal && pfgm === r.firstGoalMinute)) {
       pts += 25;
     }
+  }
+
+  // ── Prorrogação / Pênaltis (knockout only — natural no-op for group stage) ───
+  if (p.has_overtime != null && r.overtime != null) {
+    pts += p.has_overtime === r.overtime ? (p.has_overtime ? 8 : 5) : 0;
+  }
+  if (p.has_shootout != null && r.shootout != null) {
+    pts += p.has_shootout === r.shootout ? (p.has_shootout ? 12 : 5) : 0;
   }
 
   return pts;
@@ -196,6 +210,8 @@ serve(async (req) => {
         result_first_to_score:    result.firstToScore,
         result_possession:        result.possession,
         result_first_goal_minute: result.firstGoalMinute ?? null,
+        result_overtime:          result.overtime ?? null,
+        result_shootout:          result.shootout ?? null,
         scored:                   true,
       })
       .eq("id", match_id)
