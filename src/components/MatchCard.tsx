@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
-import { Check, Zap, Loader2, Lock, ChevronDown, ChevronUp, Clock, Star } from "lucide-react";
+import { Check, Zap, Loader2, Lock, ChevronDown, ChevronUp, Clock, Star, ScanSearch, Footprints, Square } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -294,92 +294,59 @@ const ToggleField = ({ label, pointsSim, pointsNao, value, onChange, disabled, r
   );
 };
 
-// ── MinuteField ───────────────────────────────────────────────────────────────
-// value: null=not answered, 0=predicted no goals, 1-90=predicted minute
+// ── ExpertToggle — compact icon+label boolean field for the Expert Panel ────────
 
-interface MinuteFieldProps {
-  value: number | null;
-  onChange: (v: number | null) => void;
+interface ExpertToggleProps {
+  icon: React.ReactNode;
+  label: string;
+  pts: string;
+  value: boolean | null;
+  onChange: (v: boolean | null) => void;
   disabled?: boolean;
-  resultValue?: number | null; // undefined=not scored, null=no goals, 1-90=minute
+  resultValue?: boolean | null;
 }
 
-const MinuteField = ({ value, onChange, disabled, resultValue }: MinuteFieldProps) => {
-  const isScored  = resultValue !== undefined;
-  const isNoGoal  = value === 0;
-  const isSet     = value !== null;
+const ExpertToggle = ({ icon, label, pts, value, onChange, disabled, resultValue }: ExpertToggleProps) => {
+  const isScored   = resultValue !== undefined && resultValue !== null;
+  const isCorrect  = isScored && value === resultValue;
+  const simCorrect = isScored && resultValue === true;
+  const naoCorrect = isScored && resultValue === false;
 
-  const isCorrect = isScored && (() => {
-    if (value === null) return false;
-    const predNoGoal = value === 0;
-    const realNoGoal = resultValue === null || resultValue === 0;
-    return (predNoGoal && realNoGoal) ||
-           (!predNoGoal && !realNoGoal && value === resultValue);
-  })();
-
-  const decrement = () => {
-    if (disabled || isNoGoal || !isSet) return;
-    onChange(Math.max(1, (value as number) - 1));
+  const btnCls = (pick: boolean) => {
+    const base = "flex-1 h-6 rounded-md text-[10px] font-bold transition-all disabled:cursor-not-allowed";
+    if (isScored) {
+      const correct = pick ? simCorrect : naoCorrect;
+      if (correct)        return `${base} bg-green-500/20 text-green-400 border border-green-500/30`;
+      if (value === pick) return `${base} bg-red-500/10 text-red-400/60`;
+      return `${base} bg-muted/20 text-muted-foreground/30`;
+    }
+    if (value === pick) {
+      return pick
+        ? `${base} bg-secondary text-secondary-foreground shadow-sm`
+        : `${base} bg-destructive/80 text-destructive-foreground shadow-sm`;
+    }
+    return `${base} bg-muted text-muted-foreground ${disabled ? "" : "hover:text-foreground"}`;
   };
-  const increment = () => {
-    if (disabled || isNoGoal) return;
-    onChange(value === null ? 1 : Math.min(90, (value as number) + 1));
-  };
-  const toggleNoGoal = () => {
-    if (disabled) return;
-    onChange(isNoGoal ? null : 0);
-  };
-
-  const btnBase = cn(
-    "w-9 h-9 rounded-xl flex items-center justify-center font-bold text-lg",
-    "bg-muted text-muted-foreground transition-all active:scale-95 select-none",
-  );
 
   return (
-    <div className={cn("rounded-xl p-3 transition-colors col-span-2", isCorrect ? "bg-green-500/10 border border-green-500/20" : "bg-muted/50")}>
-      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center justify-between">
-        <span>Minuto do 1º Gol <span className="text-primary">(25 pts)</span></span>
-        {isCorrect && <Check className="w-3.5 h-3.5 text-green-400 shrink-0" />}
-      </label>
-      <div className="flex items-center gap-1.5">
-        <button type="button" onClick={decrement} disabled={disabled || isNoGoal || !isSet}
-          className={cn(btnBase, (disabled || isNoGoal || !isSet) ? "opacity-30 cursor-not-allowed" : "hover:bg-muted/70 hover:text-foreground")}>
-          −
-        </button>
-        <div className={cn(
-          "w-14 h-9 flex items-center justify-center rounded-xl border-2 font-mono font-black transition-all",
-          !isSet
-            ? "border-border/50 text-muted-foreground/40 text-lg"
-            : isNoGoal
-              ? "border-amber-500/30 text-amber-400 text-xs"
-              : isScored
-                ? isCorrect
-                  ? "border-green-500/40 text-green-400 text-lg"
-                  : "border-border/30 text-muted-foreground/50 text-lg"
-                : "border-primary/40 text-foreground text-lg",
-        )}>
-          {!isSet ? "—" : isNoGoal ? "Sem" : String(value)}
-        </div>
-        <button type="button" onClick={increment} disabled={disabled || isNoGoal}
-          className={cn(btnBase, (disabled || isNoGoal) ? "opacity-30 cursor-not-allowed" : "hover:bg-muted/70 hover:text-foreground")}>
-          +
-        </button>
-        <button type="button" onClick={toggleNoGoal} disabled={disabled}
-          className={cn(
-            "flex-1 h-9 rounded-xl text-xs font-bold transition-all",
-            disabled ? "opacity-30 cursor-not-allowed" : "",
-            isNoGoal
-              ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-              : "bg-muted text-muted-foreground hover:text-foreground",
-          )}>
-          Sem gol
-        </button>
+    <div className={cn(
+      "rounded-lg p-1.5 flex flex-col gap-1 transition-colors",
+      isCorrect ? "bg-green-500/10 border border-green-500/20" : "bg-muted/60 border border-border/20",
+    )}>
+      <div className="flex items-center gap-1 leading-none">
+        <span className={cn("shrink-0", isCorrect ? "text-green-400" : "text-muted-foreground/70")}>{icon}</span>
+        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-wide truncate">{label}</span>
+        {isCorrect && <Check className="w-2.5 h-2.5 text-green-400 shrink-0 ml-auto" />}
       </div>
-      {isScored && (
-        <p className="text-[10px] text-muted-foreground mt-1.5">
-          Resultado: {(resultValue === null || resultValue === 0) ? "Sem gol" : `${resultValue}'`}
-        </p>
-      )}
+      <div className="text-[8px] text-primary font-semibold leading-none">{pts}</div>
+      <div className="flex gap-1">
+        <button type="button" disabled={disabled}
+          onClick={() => !disabled && onChange(value === true ? null : true)}
+          className={btnCls(true)}>Sim</button>
+        <button type="button" disabled={disabled}
+          onClick={() => !disabled && onChange(value === false ? null : false)}
+          className={btnCls(false)}>Não</button>
+      </div>
     </div>
   );
 };
@@ -1083,62 +1050,161 @@ const MatchCard = ({
                 )}
 
                 <div className={loadingPrediction ? "hidden" : "space-y-3"}>
-                  {/* Vencedor */}
-                  <div>
-                    <label className={cn(
-                      "text-xs uppercase tracking-wider font-semibold mb-2 flex items-center gap-1.5",
-                      fieldChecks?.winner ? "text-green-400" : "text-muted-foreground",
-                    )}>
-                      Vencedor / Empate <span className="text-primary">(10 pts)</span>
-                      {fieldChecks?.winner && <Check className="w-3.5 h-3.5" />}
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {([
-                        { key: "A" as const, label: teamA },
-                        { key: "X" as const, label: "Empate" },
-                        { key: "B" as const, label: teamB },
-                      ]).map(({ key, label }) => {
-                        const isSelected = winner === key;
-                        const isCrt  = scored && resultWinner != null ? key === resultWinner : null;
-                        return (
-                          <button key={key} type="button" disabled={isLocked}
-                            onClick={() => {
-                              if (isLocked) return;
-                              const next = winner === key ? null : key;
-                              // User manually overriding — clear auto-tracking
-                              autoWinnerRef.current = null;
-                              setWinner(next);
-                            }}
-                            className={choiceButtonClass(isSelected, isCrt)}
-                          >{label}</button>
-                        );
-                      })}
+                  {/* ── Two-col: Winner | Expert Panel ── */}
+                  <div className="grid grid-cols-2 gap-3">
+
+                    {/* Left col — Resultado (stacked) */}
+                    <div className="flex flex-col">
+                      <label className={cn(
+                        "text-[9px] uppercase tracking-wider font-black mb-2 flex items-center gap-1 leading-none",
+                        fieldChecks?.winner ? "text-green-400" : "text-muted-foreground",
+                      )}>
+                        Resultado <span className="text-primary">(10 pts)</span>
+                        {fieldChecks?.winner && <Check className="w-3 h-3 shrink-0" />}
+                      </label>
+                      <div className="flex flex-col gap-1.5 flex-1">
+                        {([
+                          { key: "A" as const, label: `Casa` },
+                          { key: "X" as const, label: "Empate" },
+                          { key: "B" as const, label: `Fora` },
+                        ]).map(({ key, label }) => {
+                          const isSelected = winner === key;
+                          const isCrt = scored && resultWinner != null ? key === resultWinner : null;
+                          return (
+                            <button key={key} type="button" disabled={isLocked}
+                              onClick={() => {
+                                if (isLocked) return;
+                                const next = winner === key ? null : key;
+                                autoWinnerRef.current = null;
+                                setWinner(next);
+                              }}
+                              className={cn(choiceButtonClass(isSelected, isCrt), "w-full text-xs")}
+                            >{label}</button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Right col — Expert Panel 2×2 */}
+                    <div className="rounded-xl border border-border/30 bg-muted/10 p-2 flex flex-col gap-1.5">
+                      <div className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest leading-none">
+                        Especialista
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+
+                        {/* Minute cell */}
+                        {(() => {
+                          const isNoGoal      = firstGoalMinute === 0;
+                          const minuteCorrect = fieldChecks?.minute ?? false;
+                          return (
+                            <div className={cn(
+                              "rounded-lg p-1.5 flex flex-col gap-1 transition-colors",
+                              minuteCorrect
+                                ? "bg-green-500/10 border border-green-500/20"
+                                : "bg-muted/60 border border-border/20",
+                            )}>
+                              <div className="flex items-center gap-1 leading-none">
+                                <Clock className={cn("w-2.5 h-2.5 shrink-0", minuteCorrect ? "text-green-400" : "text-muted-foreground/70")} />
+                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-wide truncate">Minuto</span>
+                                {minuteCorrect && <Check className="w-2.5 h-2.5 text-green-400 shrink-0 ml-auto" />}
+                              </div>
+                              <div className="text-[8px] text-primary font-semibold leading-none">25 pts</div>
+                              <div className="flex gap-1">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  pattern="[0-9]*"
+                                  value={isNoGoal || firstGoalMinute === null ? "" : String(firstGoalMinute)}
+                                  onChange={e => {
+                                    if (isLocked) return;
+                                    const raw = e.target.value.replace(/\D/g, "");
+                                    if (raw === "") { setFirstGoalMinute(null); return; }
+                                    const n = Math.min(90, parseInt(raw, 10));
+                                    if (!isNaN(n) && n > 0) setFirstGoalMinute(n);
+                                  }}
+                                  disabled={isLocked || isNoGoal}
+                                  placeholder="—"
+                                  className={cn(
+                                    "w-9 h-7 text-center text-xs font-black rounded-md border-2 bg-background focus:outline-none transition-all",
+                                    "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none",
+                                    isNoGoal
+                                      ? "border-border/20 text-muted-foreground/30"
+                                      : firstGoalMinute !== null
+                                        ? minuteCorrect
+                                          ? "border-green-500/40 text-green-400"
+                                          : "border-primary/40 text-foreground"
+                                        : "border-border/50 text-muted-foreground/40",
+                                    (isLocked || isNoGoal) && "opacity-50 cursor-not-allowed",
+                                  )}
+                                />
+                                <button type="button" disabled={isLocked}
+                                  onClick={() => !isLocked && setFirstGoalMinute(isNoGoal ? null : 0)}
+                                  className={cn(
+                                    "flex-1 h-7 rounded-md text-[9px] font-bold transition-all",
+                                    isNoGoal
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : "bg-muted text-muted-foreground",
+                                    isLocked && "opacity-50 cursor-not-allowed",
+                                  )}>
+                                  0-0
+                                </button>
+                              </div>
+                              <div className="flex gap-1">
+                                {[45, 90].map(m => (
+                                  <button key={m} type="button"
+                                    disabled={isLocked || isNoGoal}
+                                    onClick={() => !isLocked && !isNoGoal && setFirstGoalMinute(m)}
+                                    className={cn(
+                                      "flex-1 h-5 rounded text-[9px] font-bold transition-all",
+                                      firstGoalMinute === m && !isNoGoal
+                                        ? "bg-primary/20 text-primary border border-primary/30"
+                                        : "bg-muted/80 text-muted-foreground",
+                                      (isLocked || isNoGoal) && "opacity-30 cursor-not-allowed",
+                                    )}>
+                                    {m}'
+                                  </button>
+                                ))}
+                              </div>
+                              {scored && (
+                                <p className="text-[8px] text-muted-foreground leading-none">
+                                  {(resultFirstGoalMinute === null || resultFirstGoalMinute === 0)
+                                    ? "Sem gol" : `${resultFirstGoalMinute}'`}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        <ExpertToggle
+                          icon={<ScanSearch className="w-2.5 h-2.5" />}
+                          label="VAR" pts="S:12 / N:5"
+                          value={varGoal} onChange={setVarGoal} disabled={isLocked}
+                          resultValue={scored ? resultVarGoal : undefined}
+                        />
+                        <ExpertToggle
+                          icon={<Footprints className="w-2.5 h-2.5" />}
+                          label="Gol 1ºT" pts="5 pts"
+                          value={goalFirstHalf} onChange={setGoalFirstHalf} disabled={isLocked}
+                          resultValue={scored ? resultGoalFirstHalf : undefined}
+                        />
+                        <ExpertToggle
+                          icon={<Square className="w-2.5 h-2.5" />}
+                          label="Expulsão" pts="S:12 / N:5"
+                          value={redCard} onChange={setRedCard} disabled={isLocked}
+                          resultValue={scored ? resultRedCard : undefined}
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Toggles */}
+                  {/* Remaining toggles — 2nd half goal + penalty */}
                   <div className="grid grid-cols-2 gap-3">
-                    <ToggleField label="Gol no 1º Tempo"  pointsSim={5}  pointsNao={5}
-                      value={goalFirstHalf}  onChange={setGoalFirstHalf}  disabled={isLocked}
-                      resultValue={scored ? resultGoalFirstHalf : undefined} />
-                    <ToggleField label="Gol no 2º Tempo"  pointsSim={5}  pointsNao={5}
+                    <ToggleField label="Gol no 2º Tempo" pointsSim={5}  pointsNao={5}
                       value={goalSecondHalf} onChange={setGoalSecondHalf} disabled={isLocked}
                       resultValue={scored ? resultGoalSecondHalf : undefined} />
-                    <ToggleField label="Terá Expulsão?"   pointsSim={12} pointsNao={5}
-                      value={redCard}        onChange={setRedCard}        disabled={isLocked}
-                      resultValue={scored ? resultRedCard : undefined} />
-                    <ToggleField label="Terá Pênalti?"    pointsSim={12} pointsNao={5}
+                    <ToggleField label="Terá Pênalti?"   pointsSim={12} pointsNao={5}
                       value={penalty}        onChange={setPenalty}        disabled={isLocked}
                       resultValue={scored ? resultPenalty : undefined} />
-                    <ToggleField label="VAR Anulou Gol?"  pointsSim={12} pointsNao={5}
-                      value={varGoal}        onChange={setVarGoal}        disabled={isLocked}
-                      resultValue={scored ? resultVarGoal : undefined} />
-                    <MinuteField
-                      value={firstGoalMinute}
-                      onChange={setFirstGoalMinute}
-                      disabled={isLocked}
-                      resultValue={scored ? resultFirstGoalMinute : undefined}
-                    />
                   </div>
 
                   {/* 1º a marcar */}
