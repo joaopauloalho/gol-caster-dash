@@ -13,39 +13,47 @@
  * VAR anulou gol — Sim:     12 pts | Não certo: 5 pts (mesmo padrão)
  * 1º a marcar:               8 pts
  * Posse de bola:             5 pts
+ * Minuto do 1º gol:         25 pts (exato); proximidade usada como tie-breaker no ranking diário
+ *   pred=null → não respondeu (0 pts); pred=0 → sem gol; pred=1-90 → minuto
+ *   result=null → sem gols; result=1-90 → minuto
  * Gabarito perfeito (10/10): 125 pts base (pré-multiplicador de fase; sobrescreve somas individuais)
+ *   Minuto do 1º gol é bônus adicional aplicado APÓS gabarito, máximo total = 150 pts
  *
- * MAX_BASE_POINTS = 125 (gabarito perfeito)
+ * MAX_BASE_POINTS = 150 (gabarito 125 + minuto 25)
  */
 
 export interface PredictionInput {
-  home_score:       number | null;
-  away_score:       number | null;
-  winner_pick:      string | null;
-  goal_first_half:  boolean | null;
-  goal_second_half: boolean | null;
-  has_red_card:     boolean | null;
-  has_penalty:      boolean | null;
-  has_var_goal:     boolean | null;
-  first_to_score:   string | null;
-  possession_winner:string | null;
+  home_score:          number | null;
+  away_score:          number | null;
+  winner_pick:         string | null;
+  goal_first_half:     boolean | null;
+  goal_second_half:    boolean | null;
+  has_red_card:        boolean | null;
+  has_penalty:         boolean | null;
+  has_var_goal:        boolean | null;
+  first_to_score:      string | null;
+  possession_winner:   string | null;
+  /** null=não respondeu, 0=sem gol, 1-90=minuto */
+  first_goal_minute?:  number | null;
 }
 
 export interface MatchResultInput {
-  home:           number;
-  away:           number;
-  winner:         string;
-  goalFirstHalf:  boolean;
-  goalSecondHalf: boolean;
-  redCard:        boolean;
-  penalty:        boolean;
-  varGoal:        boolean;
-  firstToScore:   string;
-  possession:     string;
+  home:               number;
+  away:               number;
+  winner:             string;
+  goalFirstHalf:      boolean;
+  goalSecondHalf:     boolean;
+  redCard:            boolean;
+  penalty:            boolean;
+  varGoal:            boolean;
+  firstToScore:       string;
+  possession:         string;
+  /** null=sem gols, 1-90=minuto do 1º gol */
+  firstGoalMinute?:   number | null;
 }
 
-/** Pontos base máximos (pré-multiplicador) — gabarito perfeito */
-export const MAX_BASE_POINTS = 125;
+/** Pontos base máximos (pré-multiplicador) — gabarito 125 + minuto 25 */
+export const MAX_BASE_POINTS = 150;
 
 /**
  * Retorna pontos BASE (sem multiplicadores de fase ou Golden Pick).
@@ -55,7 +63,7 @@ export function calculateMatchPoints(
   pred: PredictionInput,
   result: MatchResultInput,
 ): number {
-  // ── Gabarito perfeito: todos os campos batem → 125 pts base ──────────────
+  // ── Gabarito perfeito: 10 campos principais → 125 pts base ───────────────
   const isPerfect =
     pred.home_score       === result.home          &&
     pred.away_score       === result.away          &&
@@ -68,50 +76,63 @@ export function calculateMatchPoints(
     pred.first_to_score   === result.firstToScore  &&
     pred.possession_winner=== result.possession;
 
-  if (isPerfect) return MAX_BASE_POINTS;
-
   let pts = 0;
 
-  // ── Placar + vencedor ─────────────────────────────────────────────────────
-  const exactScore =
-    pred.home_score === result.home && pred.away_score === result.away;
-
-  if (exactScore) {
-    pts += 25;
-    if (pred.winner_pick === result.winner) pts += 10; // vencedor separado do placar exato
+  if (isPerfect) {
+    pts = 125;
   } else {
-    const correctWinner =
-      pred.winner_pick != null && pred.winner_pick === result.winner;
-    const correctDiff =
-      pred.home_score !== null &&
-      pred.away_score !== null &&
-      Math.abs(pred.home_score - pred.away_score) ===
-      Math.abs(result.home - result.away);
+    // ── Placar + vencedor ───────────────────────────────────────────────────
+    const exactScore =
+      pred.home_score === result.home && pred.away_score === result.away;
 
-    if (correctWinner && correctDiff) {
-      pts += 15; // saldo: substitui winner (não acumula +10 separado)
-    } else if (correctWinner) {
-      pts += 10;
+    if (exactScore) {
+      pts += 25;
+      if (pred.winner_pick === result.winner) pts += 10;
+    } else {
+      const correctWinner =
+        pred.winner_pick != null && pred.winner_pick === result.winner;
+      const correctDiff =
+        pred.home_score !== null &&
+        pred.away_score !== null &&
+        Math.abs(pred.home_score - pred.away_score) ===
+        Math.abs(result.home - result.away);
+
+      if (correctWinner && correctDiff) {
+        pts += 15; // saldo: substitui winner
+      } else if (correctWinner) {
+        pts += 10;
+      }
+    }
+
+    // ── Campos individuais ──────────────────────────────────────────────────
+    if (pred.goal_first_half  !== null && pred.goal_first_half  === result.goalFirstHalf)  pts += 5;
+    if (pred.goal_second_half !== null && pred.goal_second_half === result.goalSecondHalf) pts += 5;
+
+    if (pred.has_red_card !== null && pred.has_red_card === result.redCard) {
+      pts += pred.has_red_card ? 12 : 5;
+    }
+    if (pred.has_penalty  !== null && pred.has_penalty  === result.penalty) {
+      pts += pred.has_penalty ? 12 : 5;
+    }
+    if (pred.has_var_goal !== null && pred.has_var_goal === result.varGoal) {
+      pts += pred.has_var_goal ? 12 : 5;
+    }
+    if (pred.first_to_score   != null && pred.first_to_score   === result.firstToScore)  pts += 8;
+    if (pred.possession_winner != null && pred.possession_winner === result.possession)   pts += 5;
+  }
+
+  // ── Minuto do 1º gol: bônus independente do gabarito (até +25 pts) ───────
+  // pred: null=não respondeu, 0=sem gol, 1-90=minuto
+  // result: null/undefined=sem gols, 1-90=minuto
+  const pfgm = pred.first_goal_minute;
+  if (pfgm !== undefined && pfgm !== null && result.firstGoalMinute !== undefined) {
+    const predNoGoal = pfgm === 0;
+    const realNoGoal = result.firstGoalMinute === null || result.firstGoalMinute === 0;
+    if ((predNoGoal && realNoGoal) ||
+        (!predNoGoal && !realNoGoal && pfgm === result.firstGoalMinute)) {
+      pts += 25;
     }
   }
-
-  // ── Campos individuais ────────────────────────────────────────────────────
-  if (pred.goal_first_half  !== null && pred.goal_first_half  === result.goalFirstHalf)  pts += 5;
-  if (pred.goal_second_half !== null && pred.goal_second_half === result.goalSecondHalf) pts += 5;
-
-  // Expulsão assimétrica: acertar "Sim" (raro) vale mais
-  if (pred.has_red_card !== null && pred.has_red_card === result.redCard) {
-    pts += pred.has_red_card ? 12 : 5;
-  }
-
-  if (pred.has_penalty  !== null && pred.has_penalty  === result.penalty) {
-    pts += pred.has_penalty ? 12 : 5;
-  }
-  if (pred.has_var_goal !== null && pred.has_var_goal === result.varGoal) {
-    pts += pred.has_var_goal ? 12 : 5;
-  }
-  if (pred.first_to_score  != null && pred.first_to_score  === result.firstToScore)  pts += 8;
-  if (pred.possession_winner != null && pred.possession_winner === result.possession) pts += 5;
 
   return pts;
 }

@@ -294,6 +294,96 @@ const ToggleField = ({ label, pointsSim, pointsNao, value, onChange, disabled, r
   );
 };
 
+// ── MinuteField ───────────────────────────────────────────────────────────────
+// value: null=not answered, 0=predicted no goals, 1-90=predicted minute
+
+interface MinuteFieldProps {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  disabled?: boolean;
+  resultValue?: number | null; // undefined=not scored, null=no goals, 1-90=minute
+}
+
+const MinuteField = ({ value, onChange, disabled, resultValue }: MinuteFieldProps) => {
+  const isScored  = resultValue !== undefined;
+  const isNoGoal  = value === 0;
+  const isSet     = value !== null;
+
+  const isCorrect = isScored && (() => {
+    if (value === null) return false;
+    const predNoGoal = value === 0;
+    const realNoGoal = resultValue === null || resultValue === 0;
+    return (predNoGoal && realNoGoal) ||
+           (!predNoGoal && !realNoGoal && value === resultValue);
+  })();
+
+  const decrement = () => {
+    if (disabled || isNoGoal || !isSet) return;
+    onChange(Math.max(1, (value as number) - 1));
+  };
+  const increment = () => {
+    if (disabled || isNoGoal) return;
+    onChange(value === null ? 1 : Math.min(90, (value as number) + 1));
+  };
+  const toggleNoGoal = () => {
+    if (disabled) return;
+    onChange(isNoGoal ? null : 0);
+  };
+
+  const btnBase = cn(
+    "w-9 h-9 rounded-xl flex items-center justify-center font-bold text-lg",
+    "bg-muted text-muted-foreground transition-all active:scale-95 select-none",
+  );
+
+  return (
+    <div className={cn("rounded-xl p-3 transition-colors col-span-2", isCorrect ? "bg-green-500/10 border border-green-500/20" : "bg-muted/50")}>
+      <label className="text-xs uppercase tracking-wider text-muted-foreground font-semibold mb-2 flex items-center justify-between">
+        <span>Minuto do 1º Gol <span className="text-primary">(25 pts)</span></span>
+        {isCorrect && <Check className="w-3.5 h-3.5 text-green-400 shrink-0" />}
+      </label>
+      <div className="flex items-center gap-1.5">
+        <button type="button" onClick={decrement} disabled={disabled || isNoGoal || !isSet}
+          className={cn(btnBase, (disabled || isNoGoal || !isSet) ? "opacity-30 cursor-not-allowed" : "hover:bg-muted/70 hover:text-foreground")}>
+          −
+        </button>
+        <div className={cn(
+          "w-14 h-9 flex items-center justify-center rounded-xl border-2 font-mono font-black transition-all",
+          !isSet
+            ? "border-border/50 text-muted-foreground/40 text-lg"
+            : isNoGoal
+              ? "border-amber-500/30 text-amber-400 text-xs"
+              : isScored
+                ? isCorrect
+                  ? "border-green-500/40 text-green-400 text-lg"
+                  : "border-border/30 text-muted-foreground/50 text-lg"
+                : "border-primary/40 text-foreground text-lg",
+        )}>
+          {!isSet ? "—" : isNoGoal ? "Sem" : String(value)}
+        </div>
+        <button type="button" onClick={increment} disabled={disabled || isNoGoal}
+          className={cn(btnBase, (disabled || isNoGoal) ? "opacity-30 cursor-not-allowed" : "hover:bg-muted/70 hover:text-foreground")}>
+          +
+        </button>
+        <button type="button" onClick={toggleNoGoal} disabled={disabled}
+          className={cn(
+            "flex-1 h-9 rounded-xl text-xs font-bold transition-all",
+            disabled ? "opacity-30 cursor-not-allowed" : "",
+            isNoGoal
+              ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+              : "bg-muted text-muted-foreground hover:text-foreground",
+          )}>
+          Sem gol
+        </button>
+      </div>
+      {isScored && (
+        <p className="text-[10px] text-muted-foreground mt-1.5">
+          Resultado: {(resultValue === null || resultValue === 0) ? "Sem gol" : `${resultValue}'`}
+        </p>
+      )}
+    </div>
+  );
+};
+
 // ── Props ─────────────────────────────────────────────────────────────────────
 
 interface MatchCardProps {
@@ -322,6 +412,7 @@ interface MatchCardProps {
   resultVarGoal?: boolean | null;
   resultFirstToScore?: string | null;
   resultPossession?: string | null;
+  resultFirstGoalMinute?: number | null;
   onCompletionChange?: (id: number, isComplete: boolean) => void;
   saveSignal?: number;
   onSaved?: (id: number) => void;
@@ -338,7 +429,7 @@ const MatchCard = ({
   resultHome = null, resultAway = null, resultWinner = null,
   resultGoalFirstHalf = null, resultGoalSecondHalf = null,
   resultRedCard = null, resultPenalty = null, resultVarGoal = null,
-  resultFirstToScore = null, resultPossession = null,
+  resultFirstToScore = null, resultPossession = null, resultFirstGoalMinute = null,
   onCompletionChange, saveSignal, onSaved,
   goldenMatchIdForDay = null, onGoldenChange,
 }: MatchCardProps) => {
@@ -363,6 +454,7 @@ const MatchCard = ({
   const [varGoal,            setVarGoal]            = useState<boolean | null>(null);
   const [firstGoal,          setFirstGoal]          = useState<"A" | "N" | "B" | null>(null);
   const [possession,         setPossession]         = useState<"A" | "B" | null>(null);
+  const [firstGoalMinute,    setFirstGoalMinute]    = useState<number | null>(null);
   const [isDoublePoints,     setIsDoublePoints]     = useState(false);
   const [hasSavedPrediction, setHasSavedPrediction] = useState(externalHasSaved);
   const [saved,              setSaved]              = useState(false);
@@ -410,9 +502,10 @@ const MatchCard = ({
       if (d.has_red_card     != null) setRedCard(d.has_red_card);
       if (d.has_penalty      != null) setPenalty(d.has_penalty);
       if (d.has_var_goal     != null) setVarGoal(d.has_var_goal);
-      if (d.first_to_score)           setFirstGoal(d.first_to_score);
-      if (d.possession_winner)        setPossession(d.possession_winner);
-      if (d.is_double_points != null) setIsDoublePoints(d.is_double_points);
+      if (d.first_to_score)             setFirstGoal(d.first_to_score);
+      if (d.possession_winner)          setPossession(d.possession_winner);
+      if (d.first_goal_minute != null)  setFirstGoalMinute(d.first_goal_minute);
+      if (d.is_double_points != null)   setIsDoublePoints(d.is_double_points);
       setHasSavedPrediction(true);
     } catch { /* corrompido — ignorar */ }
   }, [localKey]);
@@ -437,9 +530,10 @@ const MatchCard = ({
       setRedCard(       (data.has_red_card     as boolean) ?? null);
       setPenalty(       (data.has_penalty      as boolean) ?? null);
       setVarGoal(       (data.has_var_goal     as boolean) ?? null);
-      setFirstGoal( (data.first_to_score    as "A" | "N" | "B") ?? null);
-      setPossession((data.possession_winner as "A" | "B")      ?? null);
-      setIsDoublePoints((data.is_double_points as boolean) ?? false);
+      setFirstGoal(      (data.first_to_score    as "A" | "N" | "B") ?? null);
+      setPossession(     (data.possession_winner as "A" | "B")      ?? null);
+      setFirstGoalMinute((data.first_goal_minute as number)          ?? null);
+      setIsDoublePoints( (data.is_double_points  as boolean)         ?? false);
       if (data.points_earned != null) setPointsEarned(data.points_earned as number);
       setHasSavedPrediction(true);
       if (localKey) {
@@ -449,7 +543,7 @@ const MatchCard = ({
             winner_pick: data.winner_pick, goal_first_half: data.goal_first_half,
             goal_second_half: data.goal_second_half, has_red_card: data.has_red_card,
             has_penalty: data.has_penalty, has_var_goal: data.has_var_goal, first_to_score: data.first_to_score,
-            possession_winner: data.possession_winner,
+            possession_winner: data.possession_winner, first_goal_minute: data.first_goal_minute,
           }));
         } catch { /* ignorar */ }
       }
@@ -467,7 +561,7 @@ const MatchCard = ({
   // For locked/scored cards always show advanced fields regardless of state
   const shouldShowAdvanced = advancedOpen || isLocked || matchStatus === "scored";
 
-  // Count of the 6 advanced boolean/choice fields (winner counted separately)
+  // Count of the advanced fields (winner counted separately)
   const advancedFilledCount = [
     goalFirstHalf !== null,
     goalSecondHalf !== null,
@@ -476,9 +570,10 @@ const MatchCard = ({
     varGoal !== null,
     firstGoal !== null,
     possession !== null,
+    firstGoalMinute !== null,
   ].filter(Boolean).length;
 
-  // Full count for potential points display (9 fields total: score pair + winner + 7)
+  // Full count for potential points display
   const filledCount = [
     hasScore,
     winner !== null,
@@ -489,9 +584,10 @@ const MatchCard = ({
     varGoal !== null,
     firstGoal !== null,
     possession !== null,
+    firstGoalMinute !== null,
   ].filter(Boolean).length;
 
-  const isComplete = hasScore && winner !== null && advancedFilledCount === 7;
+  const isComplete = hasScore && winner !== null && advancedFilledCount === 8;
 
   // Deadline = match start minus the 30-min lock window
   const deadlineMs = useMemo(() => {
@@ -539,15 +635,22 @@ const MatchCard = ({
   // ── Field correctness ────────────────────────────────────────────────────────
   const fieldChecks = useMemo(() => {
     if (!scored || resultHome == null || resultAway == null) return null;
+    const minuteCorrect = firstGoalMinute !== null && (() => {
+      const predNoGoal = firstGoalMinute === 0;
+      const realNoGoal = resultFirstGoalMinute === null || resultFirstGoalMinute === 0;
+      return (predNoGoal && realNoGoal) ||
+             (!predNoGoal && !realNoGoal && firstGoalMinute === resultFirstGoalMinute);
+    })();
     return {
       scoreHome:  scoreA !== "" && (scoreA as number) === resultHome,
       scoreAway:  scoreB !== "" && (scoreB as number) === resultAway,
       winner:     winner !== null && winner === resultWinner,
       firstGoal:  firstGoal !== null && firstGoal === resultFirstToScore,
       possession: possession !== null && possession === resultPossession,
+      minute:     minuteCorrect,
     };
   }, [scored, resultHome, resultAway, resultWinner, resultFirstToScore, resultPossession,
-      scoreA, scoreB, winner, firstGoal, possession]);
+      resultFirstGoalMinute, scoreA, scoreB, winner, firstGoal, possession, firstGoalMinute]);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -591,6 +694,7 @@ const MatchCard = ({
       has_var_goal:      varGoal,
       first_to_score:    firstGoal,
       possession_winner: possession,
+      first_goal_minute: firstGoalMinute,
       is_double_points:  isDoublePoints,
       updated_at:        new Date().toISOString(),
     }, { onConflict: "user_id,match_id" });
@@ -604,7 +708,8 @@ const MatchCard = ({
           winner_pick: winner, goal_first_half: goalFirstHalf,
           goal_second_half: goalSecondHalf, has_red_card: redCard,
           has_penalty: penalty, has_var_goal: varGoal, first_to_score: firstGoal,
-          possession_winner: possession, is_double_points: isDoublePoints,
+          possession_winner: possession, first_goal_minute: firstGoalMinute,
+          is_double_points: isDoublePoints,
         }));
       } catch { /* ignorar */ }
     }
@@ -922,7 +1027,7 @@ const MatchCard = ({
                   ) : (
                     <motion.span key="partial" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2">
                       <Zap className="w-4 h-4 opacity-40" />
-                      {advancedFilledCount}/7 campos avançados preenchidos
+                      {advancedFilledCount}/8 campos avançados preenchidos
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -963,9 +1068,9 @@ const MatchCard = ({
                   </span>
                   <span className={cn(
                     "text-[11px] font-bold tabular-nums",
-                    advancedFilledCount === 7 ? "text-primary" : "text-muted-foreground",
+                    advancedFilledCount === 8 ? "text-primary" : "text-muted-foreground",
                   )}>
-                    {advancedFilledCount}/7
+                    {advancedFilledCount}/8
                   </span>
                 </div>
               )}
@@ -1028,6 +1133,12 @@ const MatchCard = ({
                     <ToggleField label="VAR Anulou Gol?"  pointsSim={12} pointsNao={5}
                       value={varGoal}        onChange={setVarGoal}        disabled={isLocked}
                       resultValue={scored ? resultVarGoal : undefined} />
+                    <MinuteField
+                      value={firstGoalMinute}
+                      onChange={setFirstGoalMinute}
+                      disabled={isLocked}
+                      resultValue={scored ? resultFirstGoalMinute : undefined}
+                    />
                   </div>
 
                   {/* 1º a marcar */}

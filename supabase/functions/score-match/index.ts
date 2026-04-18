@@ -38,34 +38,37 @@ function getMultiplier(stage: string): number {
 
 // ── SYNC com src/lib/scoring.ts ───────────────────────────────────────────────
 interface Pred {
-  home_score:        number | null;
-  away_score:        number | null;
-  winner_pick:       string | null;
-  goal_first_half:   boolean | null;
-  goal_second_half:  boolean | null;
-  has_red_card:      boolean | null;
-  has_penalty:       boolean | null;
-  has_var_goal:      boolean | null;
-  first_to_score:    string | null;
-  possession_winner: string | null;
-  is_double_points:  boolean | null;
+  home_score:         number | null;
+  away_score:         number | null;
+  winner_pick:        string | null;
+  goal_first_half:    boolean | null;
+  goal_second_half:   boolean | null;
+  has_red_card:       boolean | null;
+  has_penalty:        boolean | null;
+  has_var_goal:       boolean | null;
+  first_to_score:     string | null;
+  possession_winner:  string | null;
+  is_double_points:   boolean | null;
+  /** null=não respondeu, 0=sem gol, 1-90=minuto */
+  first_goal_minute?: number | null;
 }
 
 interface Res {
-  home:           number;
-  away:           number;
-  winner:         string;
-  goalFirstHalf:  boolean;
-  goalSecondHalf: boolean;
-  redCard:        boolean;
-  penalty:        boolean;
-  varGoal:        boolean;
-  firstToScore:   string;
-  possession:     string;
+  home:              number;
+  away:              number;
+  winner:            string;
+  goalFirstHalf:     boolean;
+  goalSecondHalf:    boolean;
+  redCard:           boolean;
+  penalty:           boolean;
+  varGoal:           boolean;
+  firstToScore:      string;
+  possession:        string;
+  /** null=sem gols, 1-90=minuto do 1º gol */
+  firstGoalMinute?:  number | null;
 }
 
 function calculateMatchPoints(p: Pred, r: Res): number {
-  // Gabarito perfeito (8/8) → 100 pts base
   const isPerfect =
     p.home_score       === r.home          &&
     p.away_score       === r.away          &&
@@ -78,40 +81,53 @@ function calculateMatchPoints(p: Pred, r: Res): number {
     p.first_to_score   === r.firstToScore  &&
     p.possession_winner=== r.possession;
 
-  if (isPerfect) return 125;
-
   let pts = 0;
 
-  const exactScore = p.home_score === r.home && p.away_score === r.away;
-  if (exactScore) {
-    pts += 25;
-    if (p.winner_pick === r.winner) pts += 10;
+  if (isPerfect) {
+    pts = 125;
   } else {
-    const correctWinner = p.winner_pick != null && p.winner_pick === r.winner;
-    const correctDiff =
-      p.home_score !== null &&
-      p.away_score !== null &&
-      Math.abs(p.home_score - p.away_score) === Math.abs(r.home - r.away);
-    if (correctWinner && correctDiff) {
-      pts += 15; // saldo: substitui winner (não acumula +10 separado)
-    } else if (correctWinner) {
-      pts += 10;
+    const exactScore = p.home_score === r.home && p.away_score === r.away;
+    if (exactScore) {
+      pts += 25;
+      if (p.winner_pick === r.winner) pts += 10;
+    } else {
+      const correctWinner = p.winner_pick != null && p.winner_pick === r.winner;
+      const correctDiff =
+        p.home_score !== null &&
+        p.away_score !== null &&
+        Math.abs(p.home_score - p.away_score) === Math.abs(r.home - r.away);
+      if (correctWinner && correctDiff) {
+        pts += 15;
+      } else if (correctWinner) {
+        pts += 10;
+      }
     }
+
+    if (p.goal_first_half  !== null && p.goal_first_half  === r.goalFirstHalf)  pts += 5;
+    if (p.goal_second_half !== null && p.goal_second_half === r.goalSecondHalf) pts += 5;
+    if (p.has_red_card !== null && p.has_red_card === r.redCard) {
+      pts += p.has_red_card ? 12 : 5;
+    }
+    if (p.has_penalty  !== null && p.has_penalty  === r.penalty) {
+      pts += p.has_penalty ? 12 : 5;
+    }
+    if (p.has_var_goal !== null && p.has_var_goal === r.varGoal) {
+      pts += p.has_var_goal ? 12 : 5;
+    }
+    if (p.first_to_score    != null && p.first_to_score    === r.firstToScore)  pts += 8;
+    if (p.possession_winner != null && p.possession_winner === r.possession)    pts += 5;
   }
 
-  if (p.goal_first_half  !== null && p.goal_first_half  === r.goalFirstHalf)  pts += 5;
-  if (p.goal_second_half !== null && p.goal_second_half === r.goalSecondHalf) pts += 5;
-  if (p.has_red_card !== null && p.has_red_card === r.redCard) {
-    pts += p.has_red_card ? 12 : 5; // Sim certo=12, Não certo=5
+  // Minuto do 1º gol: bônus independente do gabarito (até +25 pts)
+  const pfgm = p.first_goal_minute;
+  if (pfgm !== undefined && pfgm !== null && r.firstGoalMinute !== undefined) {
+    const predNoGoal = pfgm === 0;
+    const realNoGoal = r.firstGoalMinute === null || r.firstGoalMinute === 0;
+    if ((predNoGoal && realNoGoal) ||
+        (!predNoGoal && !realNoGoal && pfgm === r.firstGoalMinute)) {
+      pts += 25;
+    }
   }
-  if (p.has_penalty  !== null && p.has_penalty  === r.penalty) {
-    pts += p.has_penalty ? 12 : 5;
-  }
-  if (p.has_var_goal !== null && p.has_var_goal === r.varGoal) {
-    pts += p.has_var_goal ? 12 : 5;
-  }
-  if (p.first_to_score  != null && p.first_to_score  === r.firstToScore)  pts += 8;
-  if (p.possession_winner != null && p.possession_winner === r.possession) pts += 5;
 
   return pts;
 }
@@ -169,17 +185,18 @@ serve(async (req) => {
     const { data: match, error: matchErr } = await supabase
       .from("matches")
       .update({
-        result_home:             result.home,
-        result_away:             result.away,
-        result_winner:           result.winner,
-        result_goal_first_half:  result.goalFirstHalf,
-        result_goal_second_half: result.goalSecondHalf,
-        result_red_card:         result.redCard,
-        result_penalty:          result.penalty,
-        result_var_goal:         result.varGoal,
-        result_first_to_score:   result.firstToScore,
-        result_possession:       result.possession,
-        scored:                  true,
+        result_home:              result.home,
+        result_away:              result.away,
+        result_winner:            result.winner,
+        result_goal_first_half:   result.goalFirstHalf,
+        result_goal_second_half:  result.goalSecondHalf,
+        result_red_card:          result.redCard,
+        result_penalty:           result.penalty,
+        result_var_goal:          result.varGoal,
+        result_first_to_score:    result.firstToScore,
+        result_possession:        result.possession,
+        result_first_goal_minute: result.firstGoalMinute ?? null,
+        scored:                   true,
       })
       .eq("id", match_id)
       .select("stage")
