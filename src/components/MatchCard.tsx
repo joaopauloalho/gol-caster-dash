@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
-import { Check, Zap, Loader2, Lock, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { Check, Zap, Loader2, Lock, ChevronDown, ChevronUp, Clock, Star } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
@@ -702,13 +702,30 @@ const MatchCard = ({
   return (
     <div
       className={cn(
-        "rounded-2xl border overflow-hidden transition-all duration-normal",
+        "rounded-2xl border overflow-hidden transition-all duration-normal relative",
         cardBorderClass(),
         cardBgClass(),
         isExact && matchStatus === "scored" && "shadow-glow-gold",
+        isDoublePoints && "ring-2 ring-[#BF953F] shadow-[0_0_20px_rgba(191,149,63,0.3)]",
       )}
       style={{ background: "var(--gradient-surface)" }}
     >
+      {/* ── Golden shimmer sweep ── */}
+      {isDoublePoints && (
+        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+          <div className="absolute top-0 h-full w-1/3 bg-gradient-to-r from-transparent via-[#FCF6BA]/8 to-transparent animate-gold-shimmer" />
+        </div>
+      )}
+
+      {/* ── Golden badge (top-right corner) ── */}
+      {isDoublePoints && (
+        <div className="absolute top-0 right-0 z-20 pointer-events-none">
+          <span className="block text-[10px] font-black text-black px-2.5 py-1 bg-gradient-to-r from-[#BF953F] via-[#FCF6BA] to-[#B38728] rounded-bl-xl tracking-wider leading-none select-none">
+            PALPITE DE OURO 2×
+          </span>
+        </div>
+      )}
+
       {/* ── Header row ── */}
       <div className="flex items-center justify-between px-4 pt-3 pb-2">
         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border border-secondary/30 bg-secondary/10 text-secondary-foreground/80 uppercase tracking-wider">
@@ -748,7 +765,11 @@ const MatchCard = ({
 
           {/* VS separator */}
           <div className="shrink-0 flex flex-col items-center justify-center px-2">
-            <span className="text-[11px] font-black text-muted-foreground/50 tracking-widest">VS</span>
+            {isDoublePoints ? (
+              <Star className="w-5 h-5 fill-[#FCF6BA] text-[#BF953F] drop-shadow-[0_0_6px_rgba(191,149,63,0.8)]" />
+            ) : (
+              <span className="text-[11px] font-black text-muted-foreground/50 tracking-widest">VS</span>
+            )}
           </div>
 
           {/* Team B */}

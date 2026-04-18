@@ -184,6 +184,12 @@ export default {
           from: { transform: "translateX(-600%)" },
           to:   { transform: "translateX(600%)" },
         },
+        "gold-shimmer": {
+          "0%, 65%":  { transform: "translateX(-200%) skewX(-20deg)", opacity: "0" },
+          "66%":      { opacity: "1" },
+          "99%":      { transform: "translateX(280%) skewX(-20deg)", opacity: "0" },
+          "100%":     { transform: "translateX(-200%) skewX(-20deg)", opacity: "0" },
+        },
         marquee: {
           from: { transform: "translateX(0)" },
           to:   { transform: "translateX(calc(-100% - 1rem))" },
@@ -200,6 +206,7 @@ export default {
         "slide-up":       "slide-up 0.5s ease-out forwards",
         "pulse-gold":     "pulse-gold 2s ease-in-out infinite",
         shimmer:          "shimmer 4s infinite",
+        "gold-shimmer":   "gold-shimmer 5s ease-in-out infinite",
         marquee:          "marquee var(--duration, 40s) linear infinite",
         grid:             "grid 15s linear infinite",
       },
