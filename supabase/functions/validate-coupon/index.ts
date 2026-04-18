@@ -15,6 +15,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Rate limit: max 10 tentativas por usuário por minuto
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(userId);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(userId, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (entry.count >= 10) return false;
+  entry.count++;
+  return true;
+}
+
 // Preços canônicos (centavos) — mesmos valores de create-mp-preference
 const PLAN_AMOUNTS: Record<string, number> = {
   "pro-avista":    25000,
@@ -44,6 +58,12 @@ serve(async (req) => {
     if (authErr || !user) {
       return new Response(JSON.stringify({ error: "Token inválido" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!checkRateLimit(user.id)) {
+      return new Response(JSON.stringify({ valid: false, error: "Muitas tentativas. Aguarde 1 minuto." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

@@ -48,8 +48,8 @@ export interface MatchResultInput {
 export const MAX_BASE_POINTS = 125;
 
 /**
- * Retorna pontos BASE (pré-multiplicador de fase).
- * Aplicar: total = calculateMatchPoints(pred, result) * phaseMultiplier
+ * Retorna pontos BASE (sem multiplicadores de fase ou Golden Pick).
+ * Para o total completo use calculateTotalPoints().
  */
 export function calculateMatchPoints(
   pred: PredictionInput,
@@ -114,4 +114,18 @@ export function calculateMatchPoints(
   if (pred.possession_winner != null && pred.possession_winner === result.possession) pts += 5;
 
   return pts;
+}
+
+/**
+ * Pontos totais com multiplicador de fase e Golden Pick.
+ * Espelha: base * phaseMultiplier * (isGoldenPick ? 2 : 1) do score-match Edge Function.
+ */
+export function calculateTotalPoints(
+  pred: PredictionInput,
+  result: MatchResultInput,
+  phaseMultiplier = 1,
+  isGoldenPick = false,
+): number {
+  const base = calculateMatchPoints(pred, result);
+  return base * phaseMultiplier * (isGoldenPick ? 2 : 1);
 }

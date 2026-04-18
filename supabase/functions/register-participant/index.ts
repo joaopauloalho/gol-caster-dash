@@ -90,7 +90,7 @@ serve(async (req) => {
     // ── Fim validação de deadline ─────────────────────────────────────────────
 
     // payment_confirmed e bonus_points NUNCA vêm do cliente
-    const { error } = await supabase.from("participants").insert({
+    const { error } = await supabase.from("participants").upsert({
       id:                userId,
       user_id:           userId,
       full_name:         fullName,
@@ -105,7 +105,7 @@ serve(async (req) => {
       referred_by:       referredById ?? null,
       payment_confirmed: false,  // hardcoded — nunca do cliente
       favorite_team:     favoriteTeam ?? null,
-    });
+    }, { onConflict: "user_id", ignoreDuplicates: false });
 
     if (error) {
       return new Response(JSON.stringify({ error: error.message }), {
