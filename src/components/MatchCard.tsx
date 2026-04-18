@@ -1099,14 +1099,14 @@ const MatchCard = ({
                     </div>
                   </div>
 
-                  {/* ── Gol 2ºT + Pênalti ── */}
+                  {/* ── Gol 1ºT + Gol 2ºT ── */}
                   <div className="grid grid-cols-2 gap-3">
+                    <ToggleField label="Gol no 1º Tempo" pointsSim={5}  pointsNao={5}
+                      value={goalFirstHalf}  onChange={setGoalFirstHalf}  disabled={isLocked}
+                      resultValue={scored ? resultGoalFirstHalf : undefined} />
                     <ToggleField label="Gol no 2º Tempo" pointsSim={5}  pointsNao={5}
                       value={goalSecondHalf} onChange={setGoalSecondHalf} disabled={isLocked}
                       resultValue={scored ? resultGoalSecondHalf : undefined} />
-                    <ToggleField label="Terá Pênalti?"   pointsSim={12} pointsNao={5}
-                      value={penalty}        onChange={setPenalty}        disabled={isLocked}
-                      resultValue={scored ? resultPenalty : undefined} />
                   </div>
 
                   {/* ── Knockout only: Prorrogação + Pênaltis ── */}
@@ -1260,6 +1260,12 @@ const MatchCard = ({
                               </button>
                             ))}
                           </div>
+                          <p className="text-[10px] text-muted-foreground/50 mt-2 leading-relaxed">
+                            45+ = acréscimos do 1º tempo · 90+ = acréscimos do 2º tempo
+                          </p>
+                          <p className="text-[10px] text-amber-500/60 mt-1 leading-relaxed">
+                            Campo de desempate — acertar o minuto vale pontos extras sem cancelar o gabarito perfeito
+                          </p>
                           {scored && (
                             <p className="text-[11px] text-muted-foreground mt-2">
                               Resultado: {(resultFirstGoalMinute === null || resultFirstGoalMinute === 0) ? "Sem gol" : `${resultFirstGoalMinute}'`}
@@ -1271,15 +1277,15 @@ const MatchCard = ({
                         <div className="p-4 grid grid-cols-3 gap-2">
                           <ExpertToggle
                             icon={<ScanSearch className="w-3.5 h-3.5" />}
-                            label="Gol/VAR" pts="Sim 12 / Não 5"
+                            label="Gol Anulado VAR" pts="Sim 12 / Não 5"
                             value={varGoal} onChange={setVarGoal} disabled={isLocked}
                             resultValue={scored ? resultVarGoal : undefined}
                           />
                           <ExpertToggle
                             icon={<Footprints className="w-3.5 h-3.5" />}
-                            label="Gol 1ºT" pts="5 pts"
-                            value={goalFirstHalf} onChange={setGoalFirstHalf} disabled={isLocked}
-                            resultValue={scored ? resultGoalFirstHalf : undefined}
+                            label="Terá Pênalti?" pts="Sim 12 / Não 5"
+                            value={penalty} onChange={setPenalty} disabled={isLocked}
+                            resultValue={scored ? resultPenalty : undefined}
                           />
                           <ExpertToggle
                             icon={<Square className="w-3.5 h-3.5" />}
