@@ -5,7 +5,7 @@ DROP POLICY IF EXISTS "Predictions: update own unscored" ON public.predictions;
 CREATE POLICY "Predictions: update own unscored" ON public.predictions
   FOR UPDATE TO authenticated
   USING (
-    auth.uid()::text = user_id
+    auth.uid() = user_id
     AND NOT EXISTS (
       SELECT 1 FROM public.matches
       WHERE matches.id = predictions.match_id
@@ -13,7 +13,7 @@ CREATE POLICY "Predictions: update own unscored" ON public.predictions
     )
   )
   WITH CHECK (
-    auth.uid()::text = user_id
+    auth.uid() = user_id
     AND NOT EXISTS (
       SELECT 1 FROM public.matches
       WHERE matches.id = predictions.match_id
