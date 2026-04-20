@@ -1,6 +1,6 @@
 CREATE TABLE public.live_match_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  match_id uuid NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
+  match_id integer NOT NULL REFERENCES public.matches(id) ON DELETE CASCADE,
   event_type text NOT NULL CHECK (event_type IN ('goal','yellow_card','red_card','penalty_awarded','kickoff','halftime','fulltime','overtime_start','shootout_start')),
   minute smallint,
   team text CHECK (team IN ('home','away')),
