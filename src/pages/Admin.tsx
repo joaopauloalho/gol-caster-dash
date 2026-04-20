@@ -10,14 +10,16 @@ import {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+// CPF and WhatsApp are already masked by the Edge Function (admin-participants).
+// Raw PII is never sent to the browser.
 interface Participant {
   id: string;
   user_id: string;
   full_name: string;
   username: string | null;
   email: string;
-  cpf: string;
-  whatsapp: string;
+  cpf: string;      // masked: ***.XXX.XXX-**
+  whatsapp: string; // masked: last 4 digits replaced with ****
   plan: string;
   state: string;
   city: string;
@@ -135,11 +137,16 @@ const Admin = () => {
 
   const fetchParticipantsAndMatches = async () => {
     setLoading(true);
-    const [{ data: p }, { data: m }] = await Promise.all([
-      supabase.from("participants").select("*").order("created_at", { ascending: false }).limit(500),
+    // Participants are fetched via Edge Function so CPF/WhatsApp are masked server-side
+    const [participantsResult, { data: m }] = await Promise.all([
+      supabase.functions.invoke<{ participants: Participant[] }>("admin-participants"),
       supabase.from("matches").select("id, match_number, team_a, team_b, stage, date, scored, result_home, result_away").order("match_number"),
     ]);
-    setParticipants(p || []);
+    if (participantsResult.error) {
+      toast.error("Erro ao carregar participantes");
+    } else {
+      setParticipants(participantsResult.data?.participants || []);
+    }
     setMatches(m || []);
     setLoading(false);
   };
