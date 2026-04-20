@@ -159,6 +159,24 @@ serve(async (req) => {
     console.error("asaas-webhook: erro ao confirmar participant:", partError.message);
   }
 
+  // ── Incrementa uses_count do cupom se o participante usou um ─────────────
+  const { data: participantData } = await supabase
+    .from("participants")
+    .select("coupon_used")
+    .eq("user_id", userId)
+    .single();
+
+  if (participantData?.coupon_used) {
+    const { error: couponError } = await supabase.rpc("increment_coupon_uses", {
+      coupon_code: participantData.coupon_used,
+    });
+    if (couponError) {
+      console.error("asaas-webhook: erro ao incrementar uses_count do cupom:", couponError.message);
+    } else {
+      console.log(`asaas-webhook: cupom '${participantData.coupon_used}' incrementado para user ${userId}`);
+    }
+  }
+
   await supabase
     .from("webhook_events")
     .update({ user_id: userId, status: "confirmed" })

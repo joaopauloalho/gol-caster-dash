@@ -205,6 +205,24 @@ serve(async (req) => {
     // Não retorna 500 aqui pois subscription já foi salva; logar para correção manual
   }
 
+  // ── Incrementa uses_count do cupom se o participante usou um ─────────────
+  const { data: participantData } = await supabase
+    .from("participants")
+    .select("coupon_used")
+    .eq("user_id", userId)
+    .single();
+
+  if (participantData?.coupon_used) {
+    const { error: couponError } = await supabase.rpc("increment_coupon_uses", {
+      coupon_code: participantData.coupon_used,
+    });
+    if (couponError) {
+      console.error("mp-webhook: erro ao incrementar uses_count do cupom:", couponError.message);
+    } else {
+      console.log(`mp-webhook: cupom '${participantData.coupon_used}' incrementado para user ${userId}`);
+    }
+  }
+
   // Atualiza evento com user_id para auditoria
   await supabase
     .from("webhook_events")
