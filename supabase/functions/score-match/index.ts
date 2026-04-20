@@ -10,7 +10,7 @@
  * Saldo de gols:             15 pts — substitui vencedor: placar errado + vencedor certo + |diff| igual
  * Gol 1º / 2º tempo:        5 pts cada
  * Expulsão — Sim certo:     12 pts | Não certo: 5 pts
- * Pênalti:                   7 pts
+ * Pênalti — Sim certo:      12 pts | Não certo: 5 pts
  * 1º a marcar:               8 pts
  * Posse de bola:             5 pts
  * Gabarito perfeito (10/10): 125 pts base, depois × multiplicador de fase
@@ -23,21 +23,40 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MULTIPLIERS: Record<string, number> = {
-  "Group Stage": 1, "Grupos": 1, "Brasileirão": 1,
-  "32avos": 2,
-  "Round of 16": 2, "Oitavas": 2,
-  "Quarter-finals": 3, "Quartas": 3,
-  "Semi-finals": 4, "Semis": 4,
-  "Final": 5, "Third Place": 5,
+// SSoT: must match src/lib/stageMultipliers.ts
+const STAGE_MULTIPLIERS: Record<string, number> = {
+  // Group/regular phase — no multiplier
+  "Brasileirão": 1,
+  "Grupos":       1,
+  "Group Stage":  1,
+
+  // Round of 32 / Round of 16 — 2×
+  "32avos":       2,
+  "Round of 32":  2,
+  "Oitavas":      2,
+  "Round of 16":  2,
+
+  // Quarter-finals — 3×
+  "Quartas":        3,
+  "Quarter-finals": 3,
+
+  // Semi-finals — 4×
+  "Semis":       4,
+  "Semi-finals": 4,
+
+  // Final & Third Place — 5×
+  "Final":       5,
+  "Third Place": 5,
 };
 
 function getMultiplier(stage: string): number {
-  return MULTIPLIERS[stage] ?? 1;
+  return STAGE_MULTIPLIERS[stage] ?? 1;
 }
 
 // ── SYNC com src/lib/scoring.ts ───────────────────────────────────────────────
 interface Pred {
+  id:                 string;
+  user_id:            string;
   home_score:         number | null;
   away_score:         number | null;
   winner_pick:        string | null;
@@ -233,18 +252,29 @@ serve(async (req) => {
       });
     }
 
+    // ── Calculate points for all predictions first (avoid N+1) ───────────────
+    const updates: { id: string; points_earned: number }[] = [];
+    const pointsByUser: Map<string, number> = new Map();
+
     for (const p of predictions) {
-      const base = calculateMatchPoints(p as Pred, result as Res);
-      const total = base * multiplier * ((p as Pred).is_double_points ? 2 : 1);
-
-      await supabase
-        .from("predictions")
-        .update({ points_earned: total })
-        .eq("id", p.id);
-
+      const pred = p as Pred;
+      const base = calculateMatchPoints(pred, result as Res);
+      const total = base * multiplier * (pred.is_double_points ? 2 : 1);
+      updates.push({ id: pred.id, points_earned: total });
       if (total > 0) {
-        await supabase.rpc("increment_points", { uid: p.user_id, pts: total });
+        pointsByUser.set(pred.user_id, (pointsByUser.get(pred.user_id) ?? 0) + total);
       }
+    }
+
+    // ── Single bulk UPDATE via Postgres function ──────────────────────────────
+    const { error: bulkErr } = await supabase.rpc("bulk_update_predictions_points", {
+      updates: JSON.stringify(updates),
+    });
+    if (bulkErr) throw new Error(bulkErr.message);
+
+    // ── Increment user totals (one RPC per user, but typically few per match) ──
+    for (const [uid, pts] of pointsByUser) {
+      await supabase.rpc("increment_points", { uid, pts });
     }
 
     return new Response(

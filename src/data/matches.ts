@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { STAGE_MULTIPLIERS } from "@/lib/stageMultipliers";
 
 export interface MatchData {
   id: number;
@@ -33,6 +34,10 @@ export type PhaseKey = "Brasileirão" | "Grupos" | "32avos" | "Oitavas" | "Quart
 
 export const phases: PhaseKey[] = ["Brasileirão", "Grupos", "32avos", "Oitavas", "Quartas", "Semis", "Final"];
 
+// Re-export from SSoT so existing callers keep working
+export { STAGE_MULTIPLIERS } from "@/lib/stageMultipliers";
+
+/** @deprecated Use STAGE_MULTIPLIERS from @/lib/stageMultipliers directly */
 export const PHASE_MULTIPLIERS: Record<PhaseKey, number> = {
   Brasileirão: 1,
   Grupos: 1,
@@ -50,20 +55,7 @@ export function parseMatchDateTime(date: string, time: string): Date {
 }
 
 export function getPhaseMultiplier(stage: string): number {
-  const key = stageToPhase(stage);
-  return PHASE_MULTIPLIERS[key];
-}
-
-function stageToPhase(stage: string): PhaseKey {
-  if (stage === "Brasileirão") return "Brasileirão";
-  if (stage === "Group Stage") return "Grupos";
-  if (stage === "Round of 32") return "32avos";
-  if (stage === "Round of 16") return "Oitavas";
-  if (stage === "Quarter-finals") return "Quartas";
-  if (stage === "Semi-finals") return "Semis";
-  if (stage === "Third Place") return "Final";
-  console.warn(`[stageToPhase] unknown stage: "${stage}" — defaulting to Grupos (1×)`);
-  return "Grupos";
+  return STAGE_MULTIPLIERS[stage] ?? 1;
 }
 
 export interface MatchDay {

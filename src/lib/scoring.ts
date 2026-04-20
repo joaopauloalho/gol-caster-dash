@@ -1,6 +1,7 @@
 /**
  * scoring.ts — cálculo de pontos de um palpite vs resultado real
  *
+ * Stage multipliers SSoT: src/lib/stageMultipliers.ts
  * CONVENÇÃO (aplicar igual em server: supabase/functions/score-match/index.ts)
  *
  * Placar exato:              25 pts
@@ -57,6 +58,8 @@ export interface MatchResultInput {
   overtime?:          boolean | null;
   shootout?:          boolean | null;
 }
+
+export { STAGE_MULTIPLIERS, getStageMultiplier } from "@/lib/stageMultipliers";
 
 /** Pontos base máximos (pré-multiplicador) — gabarito 125 + minuto 25 */
 export const MAX_BASE_POINTS = 150;
