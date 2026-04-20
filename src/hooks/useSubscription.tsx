@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 
@@ -12,34 +12,33 @@ export interface Subscription {
 
 export const useSubscription = () => {
   const { user } = useAuth();
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const fetchSubscription = async () => {
-    if (!user) {
-      setSubscription(null);
-      setLoading(false);
-      return;
-    }
-    const { data } = await supabase
-      .from("subscriptions")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    setSubscription(data as Subscription | null);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchSubscription();
-  }, [user]);
+  const {
+    data: subscription = null,
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: ["subscription", user?.id],
+    enabled: !!user,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      return (data as Subscription | null) ?? null;
+    },
+  });
 
   const isActive = subscription?.payment_status === "active";
 
   const createMpPreference = async (plan: string, amount: number) => {
     if (!user) return { error: "Usuário não autenticado" };
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) return { error: "Sessão inválida" };
 
     const response = await fetch(
@@ -67,5 +66,5 @@ export const useSubscription = () => {
     return { init_point: data.init_point as string };
   };
 
-  return { subscription, loading, isActive, createMpPreference, refetch: fetchSubscription };
+  return { subscription, loading, isActive, createMpPreference, refetch };
 };
